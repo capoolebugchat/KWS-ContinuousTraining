@@ -9,5 +9,6 @@ RUN ls
 RUN pip install -r requirements.txt --no-cache-dir
 RUN pip install -U numpy
 
+ENTRYPOINT ["bin/bash"]
 # RUN mkdir /workspace/keyword-spotting-train
 # WORKDIR /workspace/keyword-spotting-train
