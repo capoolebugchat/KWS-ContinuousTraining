@@ -10,5 +10,3 @@ RUN rm -f requirements.txt
 
 RUN mkdir /workspace/keyword-spotting-train
 WORKDIR /workspace/keyword-spotting-train
-
-CMD [ "/bin/bash" ]
