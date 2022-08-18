@@ -156,11 +156,11 @@ def main(_):
   # convert to SavedModel
   test.convert_model_saved(flags, 'non_stream',
                            modes.Modes.NON_STREAM_INFERENCE)
-  try:
-    test.convert_model_saved(flags, 'stream_state_internal',
-                             modes.Modes.STREAM_INTERNAL_STATE_INFERENCE)
-  except (ValueError, IndexError) as e:
-    logging.info('FAILED to run TF streaming: %s', e)
+  # try:
+  #   test.convert_model_saved(flags, 'stream_state_internal',
+  #                            modes.Modes.STREAM_INTERNAL_STATE_INFERENCE)
+  # except (ValueError, IndexError) as e:
+  #   logging.info('FAILED to run TF streaming: %s', e)
 
   logging.info('run TF non streaming model accuracy evaluation')
   # with TF

@@ -4,9 +4,10 @@ WORKDIR /workspace
 
 
 RUN apt-get update
-COPY requirements.txt requirements.txt
+COPY ./requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt --no-cache-dir
 RUN rm -f requirements.txt
+RUN pip install -U numpy
 
 RUN mkdir /workspace/keyword-spotting-train
 WORKDIR /workspace/keyword-spotting-train
