@@ -15,7 +15,6 @@ def yaml_to_env(yaml_file, env_file, data_path):
         logging.info(f"{key} = {hyperparams[key]}")
         print(f"{key} = {hyperparams[key]}")
         if isinstance(hyperparams[key], str):
-            print("tr") 
             env_file.write(f"{key} = '{hyperparams[key]}'\n")
         else: env_file.write(f"{key} = {hyperparams[key]}\n")
 
