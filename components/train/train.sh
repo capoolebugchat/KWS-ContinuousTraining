@@ -1,5 +1,5 @@
 #pre-training 
-python yaml_to_env.py --yaml-path=$2 --env-path=$3 --data-path=$4
+python yaml_to_env.py --yaml-path=$1 --env-path=$2 --data-path=$3
 pip install -r requirements.txt --no-cache-dir
 echo "Hyperparams loaded"
 
