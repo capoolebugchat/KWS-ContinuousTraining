@@ -15,4 +15,4 @@ echo "Trained"
 
 #uploading to minio
 echo "uploading train result to Minio"
-# python upload_to_minio.py --local-dir="train_res/ds_tc_resnet" --bucket-name=model-store --remote-dir=$4
+python upload_to_minio.py --local-dir="train_res/ds_tc_resnet/non_stream" --bucket-name=model-store --remote-dir=$4
