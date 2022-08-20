@@ -1,0 +1,31 @@
+name: Train
+description: Model training, v1.    
+
+inputs:
+- {name: yaml_file, type: String, description: 'yaml file path'}
+- {name: env_file, type: String, description: 'env file path'}
+- {name: data_path, type: String, description: 'dataset path'}
+- {name: bucket_name, type: String, description: 'Minio model saving bucket'}
+- {name: remote_dir, type: String, description: 'Minio model saving dir'}
+
+implementation:
+  container:
+    image: docker.io/capoolebugchat/kws-training:v0.1.0
+    # command is a list of strings (command-line arguments). 
+    # The YAML language has two syntaxes for lists and you can use either of them. 
+    # Here we use the "flow syntax" - comma-separated strings inside square brackets.
+    command: [
+      python3, 
+      # Path of the program inside the container
+      train.py,
+      --yaml-file,
+      {inputValue: yaml_file},
+      --env-file, 
+      {inputValue: env_file},
+      --data-path, 
+      {inputValue: data_path},
+      --bucket-name, 
+      {inputValue: bucket_name},
+      --remote-dir, 
+      {inputValue: remote_dir},
+    ]

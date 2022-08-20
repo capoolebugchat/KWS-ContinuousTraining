@@ -282,7 +282,7 @@ def main(_):
         logging.info('FAILED to run TFLite streaming: %s', e)
 
 if __name__ == '__main__':
-  # parser for training/testing data and speach feature flags
+# parser for training/testing data and speach feature flags
   parser = base_parser.base_parser()
 
   # sub parser for model settings
@@ -362,6 +362,7 @@ if __name__ == '__main__':
   ds_tc_resnet.model_parameters(parser_ds_tc_resnet)
 
   FLAGS, unparsed = parser.parse_known_args()
+  print(FLAGS, unparsed, sys.argv)
   if unparsed and tuple(unparsed) != ('--alsologtostderr',):
     raise ValueError('Unknown argument: {}'.format(unparsed))
   tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
