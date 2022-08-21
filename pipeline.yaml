@@ -1,0 +1,124 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: kws-train-test-pipe-
+  annotations:
+    pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+    pipelines.kubeflow.org/pipeline_compilation_time: '2022-08-21T10:18:24.503223'
+    pipelines.kubeflow.org/pipeline_spec: '{"inputs": [{"name": "yaml_file", "type":
+      "String"}, {"name": "env_file", "type": "String"}, {"name": "data_path", "type":
+      "String"}, {"name": "bucket_name", "type": "String"}, {"name": "remote_dir",
+      "type": "String"}, {"default": "", "name": "pipeline-root"}, {"default": "pipeline/KWS-train-test-pipe",
+      "name": "pipeline-name"}], "name": "KWS-train-test-pipe"}'
+    pipelines.kubeflow.org/v2_pipeline: "true"
+  labels:
+    pipelines.kubeflow.org/v2_pipeline: "true"
+    pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+spec:
+  entrypoint: kws-train-test-pipe
+  templates:
+  - name: kws-train-test-pipe
+    inputs:
+      parameters:
+      - {name: bucket_name}
+      - {name: data_path}
+      - {name: env_file}
+      - {name: pipeline-name}
+      - {name: pipeline-root}
+      - {name: remote_dir}
+      - {name: yaml_file}
+    dag:
+      tasks:
+      - name: train
+        template: train
+        arguments:
+          parameters:
+          - {name: bucket_name, value: '{{inputs.parameters.bucket_name}}'}
+          - {name: data_path, value: '{{inputs.parameters.data_path}}'}
+          - {name: env_file, value: '{{inputs.parameters.env_file}}'}
+          - {name: pipeline-name, value: '{{inputs.parameters.pipeline-name}}'}
+          - {name: pipeline-root, value: '{{inputs.parameters.pipeline-root}}'}
+          - {name: remote_dir, value: '{{inputs.parameters.remote_dir}}'}
+          - {name: yaml_file, value: '{{inputs.parameters.yaml_file}}'}
+  - name: train
+    container:
+      args: [python, workspace/train.py/kfp-launcher, --yaml-file, '{{$.inputs.parameters[''yaml_file'']}}',
+        --env-file, '{{$.inputs.parameters[''env_file'']}}', --data-path, '{{$.inputs.parameters[''data_path'']}}',
+        --bucket-name, '{{$.inputs.parameters[''bucket_name'']}}', --remote-dir, '{{$.inputs.parameters[''remote_dir'']}}']
+      command: [/kfp-launcher/launch, --mlmd_server_address, $(METADATA_GRPC_SERVICE_HOST),
+        --mlmd_server_port, $(METADATA_GRPC_SERVICE_PORT), --runtime_info_json, $(KFP_V2_RUNTIME_INFO),
+        --container_image, $(KFP_V2_IMAGE), --task_name, train, --pipeline_name, '{{inputs.parameters.pipeline-name}}',
+        --run_id, $(KFP_RUN_ID), --run_resource, workflows.argoproj.io/$(WORKFLOW_ID),
+        --namespace, $(KFP_NAMESPACE), --pod_name, $(KFP_POD_NAME), --pod_uid, $(KFP_POD_UID),
+        --pipeline_root, '{{inputs.parameters.pipeline-root}}', --enable_caching,
+        $(ENABLE_CACHING), --, 'bucket_name={{inputs.parameters.bucket_name}}', 'data_path={{inputs.parameters.data_path}}',
+        'env_file={{inputs.parameters.env_file}}', 'remote_dir={{inputs.parameters.remote_dir}}',
+        'yaml_file={{inputs.parameters.yaml_file}}', --]
+      env:
+      - name: KFP_POD_NAME
+        valueFrom:
+          fieldRef: {fieldPath: metadata.name}
+      - name: KFP_POD_UID
+        valueFrom:
+          fieldRef: {fieldPath: metadata.uid}
+      - name: KFP_NAMESPACE
+        valueFrom:
+          fieldRef: {fieldPath: metadata.namespace}
+      - name: WORKFLOW_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''workflows.argoproj.io/workflow'']'}
+      - name: KFP_RUN_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipeline/runid'']'}
+      - name: ENABLE_CACHING
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipelines.kubeflow.org/enable_caching'']'}
+      - {name: KFP_V2_IMAGE, value: 'docker.io/capoolebugchat/kws-training:v0.4.0'}
+      - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {"bucket_name": {"type":
+          "STRING"}, "data_path": {"type": "STRING"}, "env_file": {"type": "STRING"},
+          "remote_dir": {"type": "STRING"}, "yaml_file": {"type": "STRING"}}, "inputArtifacts":
+          {}, "outputParameters": {}, "outputArtifacts": {}}'}
+      envFrom:
+      - configMapRef: {name: metadata-grpc-configmap, optional: true}
+      image: docker.io/capoolebugchat/kws-training:v0.4.0
+      volumeMounts:
+      - {mountPath: /kfp-launcher, name: kfp-launcher}
+    inputs:
+      parameters:
+      - {name: bucket_name}
+      - {name: data_path}
+      - {name: env_file}
+      - {name: pipeline-name}
+      - {name: pipeline-root}
+      - {name: remote_dir}
+      - {name: yaml_file}
+    metadata:
+      annotations:
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/component_ref: '{"digest": "0a1f3c8ba86309b2b2d826f47bce08ae9d0623483ed11e5371d313203923f6f1",
+          "url": "components/train/component.yaml"}'
+        pipelines.kubeflow.org/arguments.parameters: '{"bucket_name": "{{inputs.parameters.bucket_name}}",
+          "data_path": "{{inputs.parameters.data_path}}", "env_file": "{{inputs.parameters.env_file}}",
+          "remote_dir": "{{inputs.parameters.remote_dir}}", "yaml_file": "{{inputs.parameters.yaml_file}}"}'
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/enable_caching: "true"
+    initContainers:
+    - command: [launcher, --copy, /kfp-launcher/launch]
+      image: gcr.io/ml-pipeline/kfp-launcher:1.8.7
+      name: kfp-launcher
+      mirrorVolumeMounts: true
+    volumes:
+    - {name: kfp-launcher}
+  arguments:
+    parameters:
+    - {name: yaml_file}
+    - {name: env_file}
+    - {name: data_path}
+    - {name: bucket_name}
+    - {name: remote_dir}
+    - {name: pipeline-root, value: ''}
+    - {name: pipeline-name, value: pipeline/KWS-train-test-pipe}
+  serviceAccountName: pipeline-runner

@@ -10,14 +10,14 @@ inputs:
 
 implementation:
   container:
-    image: docker.io/capoolebugchat/kws-training:v0.1.0
+    image: docker.io/capoolebugchat/kws-training:v0.4.0
     # command is a list of strings (command-line arguments). 
     # The YAML language has two syntaxes for lists and you can use either of them. 
     # Here we use the "flow syntax" - comma-separated strings inside square brackets.
     command: [
-      python3, 
+      python, 
       # Path of the program inside the container
-      train.py,
+      workspace/train.py/kfp-launcher,
       --yaml-file,
       {inputValue: yaml_file},
       --env-file, 
