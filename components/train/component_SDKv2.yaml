@@ -3,8 +3,7 @@ inputs:
 - {name: dataset, type: Dataset}
 - {name: config, type: Artifact}
 outputs:
-- {name: Output, type: 'typing_extensions.Annotated[kfp.v2.components.types.artifact_types.Model,
-    <class ''kfp.v2.components.types.type_annotations.OutputAnnotation''>]'}
+- {name: model, type: Model}
 implementation:
   container:
     image: capoolebugchat/kws-training:v0.4.0
@@ -33,10 +32,14 @@ implementation:
 
       def train(
           dataset: Input[Dataset],
-          config: Input[Artifact]
-      ) -> Output[Model]:
+          config: Input[Artifact],
+          model: Output[Model]
+      ):
 
           import logging
+          import glob
+          import yaml
+          import os
 
           logging.info(dataset.path)
           logging.info(dataset.metadata)
@@ -90,14 +93,12 @@ implementation:
           print(config.path)
           print(dataset.path)
 
-          model = Model(metadata={"version":"v0.1.1"})
+          model.metadata = {"version":"v0.1.1"}
           _yaml_to_env(config.metadata["local_path"], "hparam.env", dataset.metadata["local_path"])
           _train()
           _upload_local_directory_to_minio(
-              "./train_res/ds_tc_resnet/non_stream","model-store","/ifyouseethisyousucceeded")
+              "./train_res/ds_tc_resnet/non_stream","model-store","ifyouseethisyousucceeded")
           logging.info("Model uploaded to minio bucket.")
-
-          return model
 
     args:
     - --executor_input

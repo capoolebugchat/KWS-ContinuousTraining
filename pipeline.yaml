@@ -4,7 +4,7 @@ metadata:
   generateName: kws-train-test-pipe-
   annotations:
     pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
-    pipelines.kubeflow.org/pipeline_compilation_time: '2022-08-23T18:36:43.787800'
+    pipelines.kubeflow.org/pipeline_compilation_time: '2022-08-23T23:38:38.232570'
     pipelines.kubeflow.org/pipeline_spec: '{"inputs": [{"name": "config_file_url",
       "type": "String"}, {"name": "dataset_path", "type": "String"}, {"name": "model_S3_bucket",
       "type": "String"}, {"default": "", "name": "pipeline-root"}, {"default": "pipeline/KWS-train-test-pipe",
@@ -193,10 +193,14 @@ spec:
 
         def train(
             dataset: Input[Dataset],
-            config: Input[Artifact]
-        ) -> Output[Model]:
+            config: Input[Artifact],
+            model: Output[Model]
+        ):
 
             import logging
+            import glob
+            import yaml
+            import os
 
             logging.info(dataset.path)
             logging.info(dataset.metadata)
@@ -250,14 +254,12 @@ spec:
             print(config.path)
             print(dataset.path)
 
-            model = Model(metadata={"version":"v0.1.1"})
+            model.metadata = {"version":"v0.1.1"}
             _yaml_to_env(config.metadata["local_path"], "hparam.env", dataset.metadata["local_path"])
             _train()
             _upload_local_directory_to_minio(
-                "./train_res/ds_tc_resnet/non_stream","model-store","/ifyouseethisyousucceeded")
+                "./train_res/ds_tc_resnet/non_stream","model-store","ifyouseethisyousucceeded")
             logging.info("Model uploaded to minio bucket.")
-
-            return model
 
       - --executor_input
       - '{{$}}'
@@ -295,8 +297,8 @@ spec:
           "instanceSchema": "", "schemaVersion": "0.0.1"}, "dataset": {"metadataPath":
           "/tmp/inputs/dataset/data", "schemaTitle": "system.Dataset", "instanceSchema":
           "", "schemaVersion": "0.0.1"}}, "outputParameters": {}, "outputArtifacts":
-          {"Output": {"schemaTitle": "system.Artifact", "instanceSchema": "", "schemaVersion":
-          "0.0.1", "metadataPath": "/tmp/outputs/Output/data"}}}'}
+          {"model": {"schemaTitle": "system.Model", "instanceSchema": "", "schemaVersion":
+          "0.0.1", "metadataPath": "/tmp/outputs/model/data"}}}'}
       envFrom:
       - configMapRef: {name: metadata-grpc-configmap, optional: true}
       image: capoolebugchat/kws-training:v0.4.0
@@ -311,11 +313,11 @@ spec:
       - {name: init-artifacts-train_dataset, path: /tmp/inputs/dataset/data}
     outputs:
       artifacts:
-      - {name: train-Output, path: /tmp/outputs/Output/data}
+      - {name: train-model, path: /tmp/outputs/model/data}
     metadata:
       annotations:
         pipelines.kubeflow.org/v2_component: "true"
-        pipelines.kubeflow.org/component_ref: '{"digest": "1972d22d725465cc89c5594667ed10e16e0fa843a59282596680bc2f007c16bf",
+        pipelines.kubeflow.org/component_ref: '{"digest": "b415257e21db58942bebfe1c80c8b384b624c1d2049044d261d299cef4b206a5",
           "url": "components/train/component_SDKv2.yaml"}'
       labels:
         pipelines.kubeflow.org/kfp_sdk_version: 1.8.13

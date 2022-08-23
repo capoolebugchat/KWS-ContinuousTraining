@@ -1,5 +1,4 @@
 from collections import namedtuple
-import os
 import argparse
 from minio import Minio
 import glob
@@ -18,10 +17,14 @@ from typing import NamedTuple
 )
 def train(
     dataset: Input[Dataset],
-    config: Input[Artifact]
-) -> Output[Model]:
+    config: Input[Artifact],
+    model: Output[Model]
+):
 
     import logging
+    import glob
+    import yaml
+    import os
 
     logging.info(dataset.path)
     logging.info(dataset.metadata)
@@ -75,14 +78,12 @@ def train(
     print(config.path)
     print(dataset.path)
     
-    model = Model(metadata={"version":"v0.1.1"})
+    model.metadata = {"version":"v0.1.1"}
     _yaml_to_env(config.metadata["local_path"], "hparam.env", dataset.metadata["local_path"])
     _train()
     _upload_local_directory_to_minio(
-        "./train_res/ds_tc_resnet/non_stream","model-store","/ifyouseethisyousucceeded")
+        "./train_res/ds_tc_resnet/non_stream","model-store","ifyouseethisyousucceeded")
     logging.info("Model uploaded to minio bucket.")
-
-    return model
     
 # from kfp.v2.components.component_factory import create_component_from_func
 # if __name__ == "__main__":
