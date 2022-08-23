@@ -3,7 +3,8 @@ inputs:
 - {name: dataset, type: Dataset}
 - {name: config, type: Artifact}
 outputs:
-- {name: model, type: Model}
+- {name: Output, type: 'typing_extensions.Annotated[kfp.v2.components.types.artifact_types.Model,
+    <class ''kfp.v2.components.types.type_annotations.OutputAnnotation''>]'}
 implementation:
   container:
     image: capoolebugchat/kws-training:v0.4.0
@@ -16,7 +17,7 @@ implementation:
           python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
       fi
 
-      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'kfp==1.8.13' && "$0" "$@"
+      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'minio' 'kfp==1.8.11' && "$0" "$@"
     - sh
     - -ec
     - |
@@ -32,16 +33,25 @@ implementation:
 
       def train(
           dataset: Input[Dataset],
-          config: Input[Artifact],
-          model: Output[Model],
-      ):
+          config: Input[Artifact]
+      ) -> Output[Model]:
 
+          import logging
+
+          logging.info(dataset.path)
+          logging.info(dataset.metadata)
+          logging.info(config.path)
+          logging.info(config.metadata)
+
+          from minio import Minio
           minio_client = Minio(
               "minio-service.kubeflow.svc.cluster.local:9000",
               access_key="minio",
               secret_key="minio123",
               secure=False
           )
+
+          logging.info(f"connected to Minio Server at minio-service.kubeflow.svc.cluster.local:9000")
 
           def _yaml_to_env(yaml_file, env_file, data_path):
 
@@ -59,11 +69,12 @@ implementation:
                   else: env_f.write(f"{key} = {hyperparams[key]}\n")
 
           def _train():
+              logging.info("Traning commencing.")
               os.system("python -m kws_streaming.train.model_train_eval ds_tc_resnet --alsologtostderr")
+              logging.info("Training completed.")
 
           def _upload_local_directory_to_minio(local_path, bucket_name, minio_path):
               assert os.path.isdir(local_path)
-
               for local_file in glob.glob(local_path + '/**'):
                   local_file = local_file.replace(os.sep, "/") # Replace \ with / on Windows
                   if not os.path.isfile(local_file):
@@ -76,10 +87,15 @@ implementation:
                           os.sep, "/")  # Replace \ with / on Windows
                       minio_client.fput_object(bucket_name, remote_path, local_file)
 
-          _yaml_to_env(config.path, "hparam.env", dataset.path)
+          print(config.path)
+          print(dataset.path)
+
+          model = Model(metadata={"version":"v0.1.1"})
+          _yaml_to_env(config.metadata["local_path"], "hparam.env", dataset.metadata["local_path"])
           _train()
           _upload_local_directory_to_minio(
-              "./train_res/ds_tc_resnet/non_stream",model.metadata["bucket_name"],model.path)
+              "./train_res/ds_tc_resnet/non_stream","model-store","/ifyouseethisyousucceeded")
+          logging.info("Model uploaded to minio bucket.")
 
           return model
 

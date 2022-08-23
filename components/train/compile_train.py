@@ -13,14 +13,22 @@ from typing import NamedTuple
 
 @component(
     base_image="capoolebugchat/kws-training:v0.4.0",
-    output_component_file="component_SDKv2.yaml"
+    packages_to_install=["minio"],
+    output_component_file="components/train/component_SDKv2.yaml"
 )
 def train(
     dataset: Input[Dataset],
-    config: Input[Artifact],
-    model: Output[Model],
-):
+    config: Input[Artifact]
+) -> Output[Model]:
 
+    import logging
+
+    logging.info(dataset.path)
+    logging.info(dataset.metadata)
+    logging.info(config.path)
+    logging.info(config.metadata)
+    
+    from minio import Minio
     minio_client = Minio(
         "minio-service.kubeflow.svc.cluster.local:9000",
         access_key="minio",
@@ -64,10 +72,14 @@ def train(
                     os.sep, "/")  # Replace \ with / on Windows
                 minio_client.fput_object(bucket_name, remote_path, local_file)
     
-    _yaml_to_env(config.path, "hparam.env", dataset.path)
+    print(config.path)
+    print(dataset.path)
+    
+    model = Model(metadata={"version":"v0.1.1"})
+    _yaml_to_env(config.metadata["local_path"], "hparam.env", dataset.metadata["local_path"])
     _train()
     _upload_local_directory_to_minio(
-        "./train_res/ds_tc_resnet/non_stream",model.metadata["bucket_name"],model.path)
+        "./train_res/ds_tc_resnet/non_stream","model-store","/ifyouseethisyousucceeded")
     logging.info("Model uploaded to minio bucket.")
 
     return model

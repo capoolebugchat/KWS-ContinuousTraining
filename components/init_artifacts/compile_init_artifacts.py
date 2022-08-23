@@ -10,24 +10,24 @@ from typing import NamedTuple, Optional
 
 
 @component(
-    output_component_file="component_SDKv2.yaml"
+    output_component_file="components/init_artifacts/component_SDKv2.yaml"
 )
 def init_artifacts(
-    config_file_url: str,
+    config_path: str,
     dataset_path: str,
     bucket_name: str,
-    version: Optional[str]
-)->NamedTuple(
-  'ExampleOutputs',[
-    ('config', Artifact),
-    ('dataset', Dataset)]
+    version: Optional[str],
+    train_config: Output[Artifact],
+    train_dataset: Output[Dataset],
 ):
     
-    config = Artifact(name="train_config", uri=config_file_url)
-    dataset = Dataset(name="train_dataset", uri=dataset_path)
+    train_config.metadata = {"version":version, "local_path":config_path}
+    # train_config.path = config_path
+    train_dataset.metadata= {"version":version, "local_path":dataset_path}
+    # train_dataset.path = dataset_path
 
-    from collections import namedtuple
-    _output = namedtuple(
-      'InitArtifacts',['config', 'dataset'])
+    # from collections import namedtuple
+    # _output = namedtuple(
+    #   'InitArtifacts',['train_config', 'train_dataset'])
     
-    return _output(config=config, dataset=dataset)
+    # return _output(train_config=config, train_dataset=dataset)
