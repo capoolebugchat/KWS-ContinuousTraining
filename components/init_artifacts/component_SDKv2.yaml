@@ -1,13 +1,15 @@
-name: Train
-description: Train
+name: Init artifacts
 inputs:
-- {name: dataset, type: Dataset}
-- {name: config, type: Artifact}
-- {name: model, type: Model}
+- {name: config_file_url, type: String}
+- {name: dataset_path, type: String}
 - {name: bucket_name, type: String}
+- {name: version, type: String}
+outputs:
+- {name: config, type: Artifact}
+- {name: dataset, type: Dataset}
 implementation:
   container:
-    image: docker.io/capoolebugchat/kws-training:v0.4.0
+    image: python:3.7
     command:
     - sh
     - -c
@@ -31,11 +33,28 @@ implementation:
       from kfp.v2.dsl import *
       from typing import *
 
-      def pass_locals():
-          return dict_func(locals())  # noqa: F821 TODO
+      def init_artifacts(
+          config_file_url: str,
+          dataset_path: str,
+          bucket_name: str,
+          version: Optional[str]
+      )->NamedTuple(
+        'ExampleOutputs',[
+          ('config', Artifact),
+          ('dataset', Dataset)]
+      ):
+
+          config = Artifact(name="train_config", uri=config_file_url)
+          dataset = Dataset(name="train_dataset", uri=dataset_path)
+
+          from collections import namedtuple
+          _output = namedtuple(
+            'InitArtifacts',['config', 'dataset'])
+
+          return _output(config=config, dataset=dataset)
 
     args:
     - --executor_input
     - {executorInput: null}
     - --function_to_execute
-    - Train
+    - init_artifacts

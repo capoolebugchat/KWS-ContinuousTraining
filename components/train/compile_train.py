@@ -11,13 +11,15 @@ from kfp.v2.dsl import (
     Input, Output, Artifact, Model, Dataset,component)
 from typing import NamedTuple
 
-@component
+@component(
+    base_image="capoolebugchat/kws-training:v0.4.0",
+    output_component_file="component_SDKv2.yaml"
+)
 def train(
     dataset: Input[Dataset],
     config: Input[Artifact],
-    model: Input[Model],
-    bucket_name: str
-)->namedtuple("model", [Model]):
+    model: Output[Model],
+):
 
     minio_client = Minio(
         "minio-service.kubeflow.svc.cluster.local:9000",
@@ -26,6 +28,8 @@ def train(
         secure=False
     )
 
+    logging.info(f"connected to Minio Server at minio-service.kubeflow.svc.cluster.local:9000")
+    
     def _yaml_to_env(yaml_file, env_file, data_path):
     
         yaml_f = open(yaml_file,'r')
@@ -42,11 +46,12 @@ def train(
             else: env_f.write(f"{key} = {hyperparams[key]}\n")
 
     def _train():
+        logging.info("Traning commencing.")
         os.system("python -m kws_streaming.train.model_train_eval ds_tc_resnet --alsologtostderr")
+        logging.info("Training completed.")
 
     def _upload_local_directory_to_minio(local_path, bucket_name, minio_path):
         assert os.path.isdir(local_path)
-
         for local_file in glob.glob(local_path + '/**'):
             local_file = local_file.replace(os.sep, "/") # Replace \ with / on Windows
             if not os.path.isfile(local_file):
@@ -58,25 +63,39 @@ def train(
                 remote_path = remote_path.replace(
                     os.sep, "/")  # Replace \ with / on Windows
                 minio_client.fput_object(bucket_name, remote_path, local_file)
-
-    model.metadata["bucket"] = bucket_name
     
     _yaml_to_env(config.path, "hparam.env", dataset.path)
     _train()
     _upload_local_directory_to_minio(
-        "./train_res/",model.metadata["bucket"],model.path)
+        "./train_res/ds_tc_resnet/non_stream",model.metadata["bucket_name"],model.path)
+    logging.info("Model uploaded to minio bucket.")
 
-    model.path = bucket_name+"/test-res"
+    return model
     
-    model_ = NamedTuple("model", [("model",Model)])
+# from kfp.v2.components.component_factory import create_component_from_func
+# if __name__ == "__main__":
+#     kfp.components.create_component_from_func(
+#         func=train,
+#         base_image="docker.io/capoolebugchat/kws-training:v0.4.0",
+#         output_component_file="component_v2.yaml"
+#     )
+#     @dsl.pipeline(
+#     name="KWS-train-test-pipe"
+# )
+#     def pipeline(
+#         yaml_file:str,
+#         env_file:str, 
+#         data_path:str, 
+#         bucket_name:str,
+#         remote_dir:str ):
+        
+#         train_task = train(
+#             yaml_file,
+#             env_file, 
+#             data_path, 
+#             bucket_name)
 
-    return model_(model=model)
-
-from kfp.components import create_component_from_func_v2
-if __name__ == "__main__":
-    kfp.v2.dsl.component(
-        func=train,
-        base_image="docker.io/capoolebugchat/kws-training:v0.4.0",
-        output_component_file="component_v2.yaml"
-    )
-    
+#     kfp.compiler.Compiler(mode=kfp.dsl.PipelineExecutionMode.V2_COMPATIBLE).compile(
+#         pipeline_func=pipeline,
+#         package_path='pipeline.yaml')
+ 
