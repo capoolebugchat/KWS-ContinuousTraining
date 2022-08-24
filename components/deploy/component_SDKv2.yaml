@@ -1,0 +1,48 @@
+name: Deploy
+inputs:
+- {name: model, type: Model}
+implementation:
+  container:
+    image: python:3.7
+    command:
+    - sh
+    - -c
+    - |2
+
+      if ! [ -x "$(command -v pip)" ]; then
+          python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
+      fi
+
+      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'kserve==0.8.0' 'kubernetes==18.20.0' 'kfp==1.8.13' && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp -d)
+      printf "%s" "$0" > "$program_path/ephemeral_component.py"
+      python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+    - "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing\
+      \ import *\n\ndef deploy(\n    model: Input[Model],\n):\n\n    import logging\n\
+      \    from kubernetes import client\n    import kserve\n    from kserve import\
+      \ KServeClient\n    from kserve import constants\n    from kserve import V1beta1PredictorSpec\n\
+      \    from kserve import V1beta1TFServingSpec\n    from kserve import V1beta1InferenceServiceSpec\n\
+      \    from kserve import V1beta1InferenceService\n\n    default_model_spec =\
+      \ V1beta1InferenceServiceSpec(\n        predictor=V1beta1PredictorSpec(\n  \
+      \          tensorflow=V1beta1TFServingSpec(\n                storage_uri=model.metadata[\"\
+      S3_URI\"]\n                )\n            )\n        )\n\n    isvc = V1beta1InferenceService(\n\
+      \        api_version=constants.KSERVE_V1BETA1,\n        kind=constants.KSERVE_KIND,\n\
+      \        metadata=client.V1ObjectMeta(\n            name='auto-deployed-model',\
+      \ \n            namespace='kubeflow-user-example-com'\n            ),\n    \
+      \        spec=default_model_spec\n        )\n\n    client = KServeClient()\n\
+      \    client.set_credentials(\n        storage_type = \"S3\",\n        namespace\
+      \ = \"default\",\n        service_account = \"minio-kserve-sa\"\n    )\n   \
+      \ '''mlpipeline-minio-artifact -n kubeflow-user-example-com'''\n    logging.info(\"\
+      Client created\")\n\n    client.create(isvc)\n    logging.info(\"ISVC created.\
+      \ Object sent to K8s apiserver\")\n\n    client.wait_isvc_ready(\n        name\
+      \ = 'auto-deployed-model',\n        namespace = 'kubeflow-user-example-com',\n\
+      \        timeout_seconds = 300\n        )\n    logging.info(\"ISVC ready. Model\
+      \ deployed\")\n\n"
+    args:
+    - --executor_input
+    - {executorInput: null}
+    - --function_to_execute
+    - deploy
