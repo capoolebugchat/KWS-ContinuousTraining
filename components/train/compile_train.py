@@ -12,7 +12,7 @@ from typing import NamedTuple
 
 @component(
     base_image="capoolebugchat/kws-training:v0.4.0",
-    packages_to_install=["minio"],
+    packages_to_install=["minio", "ensurepip"],
     output_component_file="components/train/component_SDKv2.yaml"
 )
 def train(

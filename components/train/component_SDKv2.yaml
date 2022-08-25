@@ -13,8 +13,9 @@ implementation:
     - -c
     - (python3 -m ensurepip || python3 -m ensurepip --user) && (PIP_DISABLE_PIP_VERSION_CHECK=1
       python3 -m pip install --quiet                 --no-warn-script-location 'minio'
-      'kfp==1.8.4' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location
-      'minio' 'kfp==1.8.4' --user) && "$0" "$@"
+      'ensurepip' 'kfp==1.8.4' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install
+      --quiet                 --no-warn-script-location 'minio' 'ensurepip' 'kfp==1.8.4'
+      --user) && "$0" "$@"
     - sh
     - -ec
     - |
