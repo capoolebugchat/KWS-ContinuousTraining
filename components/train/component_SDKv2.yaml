@@ -11,13 +11,10 @@ implementation:
     command:
     - sh
     - -c
-    - |2
-
-      if ! [ -x "$(command -v pip)" ]; then
-          python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
-      fi
-
-      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'minio' 'kfp==1.8.13' && "$0" "$@"
+    - (python3 -m ensurepip || python3 -m ensurepip --user) && (PIP_DISABLE_PIP_VERSION_CHECK=1
+      python3 -m pip install --quiet                 --no-warn-script-location 'minio'
+      'kfp==1.8.4' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location
+      'minio' 'kfp==1.8.4' --user) && "$0" "$@"
     - sh
     - -ec
     - |
@@ -26,8 +23,6 @@ implementation:
       python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
     - |2+
 
-      import kfp
-      from kfp.v2 import dsl
       from kfp.v2.dsl import *
       from typing import *
 

@@ -11,16 +11,16 @@ deploy_op = load_component_from_file("components/deploy/component_SDKv2.yaml")
     name="KWS-train-test-pipe"
 )
 def pipeline(
-    config_file_url: str,
-    dataset_path: str,
-    model_S3_bucket: str,
+    config_file_url: str = "h_param.yaml",
+    dataset_path: str = "test_dataset",
+    model_S3_bucket: str = "model-store",
 ):
     init_task = init_op(
         config_path = config_file_url,
         dataset_path = dataset_path,
-        bucket_name = model_S3_bucket,
         version = "v0.0.1")
     train_task = train_op(
+        model_S3_bucket = model_S3_bucket,
         dataset = init_task.outputs["train_dataset"],
         config = init_task.outputs["train_config"]
     )
