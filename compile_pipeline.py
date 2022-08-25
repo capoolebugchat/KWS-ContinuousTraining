@@ -5,6 +5,7 @@ from kfp.v2.dsl import Model, Dataset, Artifact
 
 init_op = load_component_from_file("components/init_artifacts/component_SDKv2.yaml")
 train_op = load_component_from_file("components/train/component_SDKv2.yaml")
+deploy_op = load_component_from_file("components/deploy/component_SDKv2.yaml")
 
 @dsl.pipeline(
     name="KWS-train-test-pipe"
@@ -22,6 +23,9 @@ def pipeline(
     train_task = train_op(
         dataset = init_task.outputs["train_dataset"],
         config = init_task.outputs["train_config"]
+    )
+    deploy_task = deploy_op(
+        model = train_task.outputs["model"]
     )
 
 kfp.compiler.Compiler(mode=kfp.dsl.PipelineExecutionMode.V2_COMPATIBLE).compile(

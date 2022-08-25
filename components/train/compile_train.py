@@ -16,6 +16,7 @@ from typing import NamedTuple
     output_component_file="components/train/component_SDKv2.yaml"
 )
 def train(
+    model_S3_bucket: str,
     dataset: Input[Dataset],
     config: Input[Artifact],
     model: Output[Model]
@@ -89,9 +90,10 @@ def train(
         data_path = dataset.metadata["local_path"])
     _train()
     _upload_local_directory_to_minio(
-        "./train_res/ds_tc_resnet/non_stream",
-        "model-store",
-        "saved_model/1")
+        local_path = "./train_res/ds_tc_resnet/non_stream",
+        bucket_name = model_S3_bucket,
+        minio_path = "saved_model/1")
+    
     logging.info("Model uploaded to minio bucket.")
     
 # from kfp.v2.components.component_factory import create_component_from_func

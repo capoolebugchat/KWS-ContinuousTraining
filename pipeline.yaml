@@ -4,7 +4,7 @@ metadata:
   generateName: kws-train-test-pipe-
   annotations:
     pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
-    pipelines.kubeflow.org/pipeline_compilation_time: '2022-08-23T23:38:38.232570'
+    pipelines.kubeflow.org/pipeline_compilation_time: '2022-08-25T10:49:21.487285'
     pipelines.kubeflow.org/pipeline_spec: '{"inputs": [{"name": "config_file_url",
       "type": "String"}, {"name": "dataset_path", "type": "String"}, {"name": "model_S3_bucket",
       "type": "String"}, {"default": "", "name": "pipeline-root"}, {"default": "pipeline/KWS-train-test-pipe",
@@ -16,6 +16,108 @@ metadata:
 spec:
   entrypoint: kws-train-test-pipe
   templates:
+  - name: deploy
+    container:
+      args:
+      - sh
+      - -c
+      - |2
+
+        if ! [ -x "$(command -v pip)" ]; then
+            python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
+        fi
+
+        PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'kserve==0.8.0' 'kubernetes==18.20.0' 'kfp==1.8.13' && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp -d)
+        printf "%s" "$0" > "$program_path/ephemeral_component.py"
+        python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+      - "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing\
+        \ import *\n\ndef deploy(\n    model: Input[Model],\n):\n\n    import logging\n\
+        \    from kubernetes import client\n    import kserve\n    from kserve import\
+        \ KServeClient\n    from kserve import constants\n    from kserve import V1beta1PredictorSpec\n\
+        \    from kserve import V1beta1TFServingSpec\n    from kserve import V1beta1InferenceServiceSpec\n\
+        \    from kserve import V1beta1InferenceService\n\n    default_model_spec\
+        \ = V1beta1InferenceServiceSpec(\n        predictor=V1beta1PredictorSpec(\n\
+        \            tensorflow=V1beta1TFServingSpec(\n                storage_uri=model.metadata[\"\
+        S3_URI\"]\n                )\n            )\n        )\n\n    isvc = V1beta1InferenceService(\n\
+        \        api_version=constants.KSERVE_V1BETA1,\n        kind=constants.KSERVE_KIND,\n\
+        \        metadata=client.V1ObjectMeta(\n            name='auto-deployed-model',\
+        \ \n            namespace='kubeflow-user-example-com'\n            ),\n  \
+        \          spec=default_model_spec\n        )\n\n    client = KServeClient()\n\
+        \    client.set_credentials(\n        storage_type = \"S3\",\n        namespace\
+        \ = \"default\",\n        service_account = \"minio-kserve-sa\"\n    )\n \
+        \   '''mlpipeline-minio-artifact -n kubeflow-user-example-com'''\n    logging.info(\"\
+        Client created\")\n\n    client.create(isvc)\n    logging.info(\"ISVC created.\
+        \ Object sent to K8s apiserver\")\n\n    client.wait_isvc_ready(\n       \
+        \ name = 'auto-deployed-model',\n        namespace = 'kubeflow-user-example-com',\n\
+        \        timeout_seconds = 300\n        )\n    logging.info(\"ISVC ready.\
+        \ Model deployed\")\n\n"
+      - --executor_input
+      - '{{$}}'
+      - --function_to_execute
+      - deploy
+      command: [/kfp-launcher/launch, --mlmd_server_address, $(METADATA_GRPC_SERVICE_HOST),
+        --mlmd_server_port, $(METADATA_GRPC_SERVICE_PORT), --runtime_info_json, $(KFP_V2_RUNTIME_INFO),
+        --container_image, $(KFP_V2_IMAGE), --task_name, deploy, --pipeline_name,
+        '{{inputs.parameters.pipeline-name}}', --run_id, $(KFP_RUN_ID), --run_resource,
+        workflows.argoproj.io/$(WORKFLOW_ID), --namespace, $(KFP_NAMESPACE), --pod_name,
+        $(KFP_POD_NAME), --pod_uid, $(KFP_POD_UID), --pipeline_root, '{{inputs.parameters.pipeline-root}}',
+        --enable_caching, $(ENABLE_CACHING), --, --]
+      env:
+      - name: KFP_POD_NAME
+        valueFrom:
+          fieldRef: {fieldPath: metadata.name}
+      - name: KFP_POD_UID
+        valueFrom:
+          fieldRef: {fieldPath: metadata.uid}
+      - name: KFP_NAMESPACE
+        valueFrom:
+          fieldRef: {fieldPath: metadata.namespace}
+      - name: WORKFLOW_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''workflows.argoproj.io/workflow'']'}
+      - name: KFP_RUN_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipeline/runid'']'}
+      - name: ENABLE_CACHING
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipelines.kubeflow.org/enable_caching'']'}
+      - {name: KFP_V2_IMAGE, value: 'python:3.7'}
+      - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {}, "inputArtifacts":
+          {"model": {"metadataPath": "/tmp/inputs/model/data", "schemaTitle": "system.Model",
+          "instanceSchema": "", "schemaVersion": "0.0.1"}}, "outputParameters": {},
+          "outputArtifacts": {}}'}
+      envFrom:
+      - configMapRef: {name: metadata-grpc-configmap, optional: true}
+      image: python:3.7
+      volumeMounts:
+      - {mountPath: /kfp-launcher, name: kfp-launcher}
+    inputs:
+      parameters:
+      - {name: pipeline-name}
+      - {name: pipeline-root}
+      artifacts:
+      - {name: train-model, path: /tmp/inputs/model/data}
+    metadata:
+      annotations:
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/component_ref: '{"digest": "b133f3950870a5baf0ac23202d4279f18a930824251389e0da76f92086d62272",
+          "url": "components/deploy/component_SDKv2.yaml"}'
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/enable_caching: "true"
+    initContainers:
+    - command: [launcher, --copy, /kfp-launcher/launch]
+      image: gcr.io/ml-pipeline/kfp-launcher:1.8.7
+      name: kfp-launcher
+      mirrorVolumeMounts: true
+    volumes:
+    - {name: kfp-launcher}
   - name: init-artifacts
     container:
       args:
@@ -147,6 +249,15 @@ spec:
       - {name: pipeline-root}
     dag:
       tasks:
+      - name: deploy
+        template: deploy
+        dependencies: [train]
+        arguments:
+          parameters:
+          - {name: pipeline-name, value: '{{inputs.parameters.pipeline-name}}'}
+          - {name: pipeline-root, value: '{{inputs.parameters.pipeline-root}}'}
+          artifacts:
+          - {name: train-model, from: '{{tasks.train.outputs.artifacts.train-model}}'}
       - name: init-artifacts
         template: init-artifacts
         arguments:
@@ -177,7 +288,7 @@ spec:
             python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
         fi
 
-        PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'minio' 'kfp==1.8.11' && "$0" "$@"
+        PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'minio' 'kfp==1.8.13' && "$0" "$@"
       - sh
       - -ec
       - |
@@ -254,11 +365,20 @@ spec:
             print(config.path)
             print(dataset.path)
 
-            model.metadata = {"version":"v0.1.1"}
-            _yaml_to_env(config.metadata["local_path"], "hparam.env", dataset.metadata["local_path"])
+            model.metadata = {
+                "version":"v0.1.1",
+                "S3_URI":"S3://model-store/saved_model"
+                }
+
+            _yaml_to_env(
+                yaml_file = config.metadata["local_path"],
+                env_file = "hparam.env",
+                data_path = dataset.metadata["local_path"])
             _train()
             _upload_local_directory_to_minio(
-                "./train_res/ds_tc_resnet/non_stream","model-store","ifyouseethisyousucceeded")
+                "./train_res/ds_tc_resnet/non_stream",
+                "model-store",
+                "saved_model/1")
             logging.info("Model uploaded to minio bucket.")
 
       - --executor_input
@@ -317,7 +437,7 @@ spec:
     metadata:
       annotations:
         pipelines.kubeflow.org/v2_component: "true"
-        pipelines.kubeflow.org/component_ref: '{"digest": "b415257e21db58942bebfe1c80c8b384b624c1d2049044d261d299cef4b206a5",
+        pipelines.kubeflow.org/component_ref: '{"digest": "b5141643e254a781deb0557a938a2135e15b726952cefcb1403912ca33364b38",
           "url": "components/train/component_SDKv2.yaml"}'
       labels:
         pipelines.kubeflow.org/kfp_sdk_version: 1.8.13

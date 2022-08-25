@@ -2,7 +2,6 @@ name: Init artifacts
 inputs:
 - {name: config_path, type: String}
 - {name: dataset_path, type: String}
-- {name: bucket_name, type: String}
 - {name: version, type: String}
 outputs:
 - {name: train_config, type: Artifact}
@@ -19,7 +18,7 @@ implementation:
           python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
       fi
 
-      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'kfp==1.8.11' && "$0" "$@"
+      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'kfp==1.8.13' && "$0" "$@"
     - sh
     - -ec
     - |
@@ -36,22 +35,16 @@ implementation:
       def init_artifacts(
           config_path: str,
           dataset_path: str,
-          bucket_name: str,
           version: Optional[str],
           train_config: Output[Artifact],
           train_dataset: Output[Dataset],
-      ):
+      ) -> None:
 
           train_config.metadata = {"version":version, "local_path":config_path}
-          # train_config.path = config_path
           train_dataset.metadata= {"version":version, "local_path":dataset_path}
-          # train_dataset.path = dataset_path
 
-          # from collections import namedtuple
-          # _output = namedtuple(
-          #   'InitArtifacts',['train_config', 'train_dataset'])
-
-          # return _output(train_config=config, train_dataset=dataset)
+          import os
+          os.system("printenv")
 
     args:
     - --executor_input

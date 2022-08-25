@@ -1,5 +1,6 @@
 name: Train
 inputs:
+- {name: model_S3_bucket, type: String}
 - {name: dataset, type: Dataset}
 - {name: config, type: Artifact}
 outputs:
@@ -16,7 +17,7 @@ implementation:
           python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
       fi
 
-      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'minio' 'kfp==1.8.11' && "$0" "$@"
+      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'minio' 'kfp==1.8.13' && "$0" "$@"
     - sh
     - -ec
     - |
@@ -31,6 +32,7 @@ implementation:
       from typing import *
 
       def train(
+          model_S3_bucket: str,
           dataset: Input[Dataset],
           config: Input[Artifact],
           model: Output[Model]
@@ -93,11 +95,21 @@ implementation:
           print(config.path)
           print(dataset.path)
 
-          model.metadata = {"version":"v0.1.1"}
-          _yaml_to_env(config.metadata["local_path"], "hparam.env", dataset.metadata["local_path"])
+          model.metadata = {
+              "version":"v0.1.1",
+              "S3_URI":"S3://model-store/saved_model"
+              }
+
+          _yaml_to_env(
+              yaml_file = config.metadata["local_path"],
+              env_file = "hparam.env",
+              data_path = dataset.metadata["local_path"])
           _train()
           _upload_local_directory_to_minio(
-              "./train_res/ds_tc_resnet/non_stream","model-store","ifyouseethisyousucceeded")
+              local_path = "./train_res/ds_tc_resnet/non_stream",
+              bucket_name = model_S3_bucket,
+              minio_path = "saved_model/1")
+
           logging.info("Model uploaded to minio bucket.")
 
     args:

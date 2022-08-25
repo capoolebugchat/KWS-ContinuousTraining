@@ -15,19 +15,13 @@ from typing import NamedTuple, Optional
 def init_artifacts(
     config_path: str,
     dataset_path: str,
-    bucket_name: str,
     version: Optional[str],
     train_config: Output[Artifact],
     train_dataset: Output[Dataset],
-):
+) -> None:
     
     train_config.metadata = {"version":version, "local_path":config_path}
-    # train_config.path = config_path
     train_dataset.metadata= {"version":version, "local_path":dataset_path}
-    # train_dataset.path = dataset_path
-
-    # from collections import namedtuple
-    # _output = namedtuple(
-    #   'InitArtifacts',['train_config', 'train_dataset'])
-    
-    # return _output(train_config=config, train_dataset=dataset)
+       
+    import os
+    os.system("printenv")

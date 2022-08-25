@@ -34,11 +34,11 @@ implementation:
       \ \n            namespace='kubeflow-user-example-com'\n            ),\n    \
       \        spec=default_model_spec\n        )\n\n    client = KServeClient()\n\
       \    client.set_credentials(\n        storage_type = \"S3\",\n        namespace\
-      \ = \"default\",\n        service_account = \"minio-kserve-sa\"\n    )\n   \
-      \ '''mlpipeline-minio-artifact -n kubeflow-user-example-com'''\n    logging.info(\"\
-      Client created\")\n\n    client.create(isvc)\n    logging.info(\"ISVC created.\
-      \ Object sent to K8s apiserver\")\n\n    client.wait_isvc_ready(\n        name\
-      \ = 'auto-deployed-model',\n        namespace = 'kubeflow-user-example-com',\n\
+      \ = \"kubeflow-user-example-com\",\n        service_account = \"default-editor\"\
+      \n    )\n    '''mlpipeline-minio-artifact -n kubeflow-user-example-com'''\n\
+      \    logging.info(\"Client created\")\n\n    client.create(isvc)\n    logging.info(\"\
+      ISVC created. Object sent to K8s apiserver\")\n\n    client.wait_isvc_ready(\n\
+      \        name = 'auto-deployed-model',\n        namespace = 'kubeflow-user-example-com',\n\
       \        timeout_seconds = 300\n        )\n    logging.info(\"ISVC ready. Model\
       \ deployed\")\n\n"
     args:
