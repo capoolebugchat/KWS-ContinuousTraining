@@ -60,8 +60,8 @@
 ### Built With
 
 * [![Python][Python.py]][Python-url]
-* [![KFP Python SDK][KFP.py]][React-url]
-* [![KServe SDK][KServe.py]][Vue-url]
+* [![KFP Python SDK][KFP.py]][KFP-url]
+* [![KServe SDK][KServe.py]][KServe-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
