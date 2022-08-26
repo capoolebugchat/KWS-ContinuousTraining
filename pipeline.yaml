@@ -3,8 +3,8 @@ kind: Workflow
 metadata:
   generateName: kws-train-test-pipe-
   annotations:
-    pipelines.kubeflow.org/kfp_sdk_version: 1.8.4
-    pipelines.kubeflow.org/pipeline_compilation_time: '2022-08-25T11:48:28.835348'
+    pipelines.kubeflow.org/kfp_sdk_version: 1.8.3
+    pipelines.kubeflow.org/pipeline_compilation_time: '2022-08-25T14:40:38.727714'
     pipelines.kubeflow.org/pipeline_spec: '{"inputs": [{"default": "h_param.yaml",
       "name": "config_file_url", "optional": true, "type": "String"}, {"default":
       "test_dataset", "name": "dataset_path", "optional": true, "type": "String"},
@@ -14,7 +14,7 @@ metadata:
     pipelines.kubeflow.org/v2_pipeline: "true"
   labels:
     pipelines.kubeflow.org/v2_pipeline: "true"
-    pipelines.kubeflow.org/kfp_sdk_version: 1.8.4
+    pipelines.kubeflow.org/kfp_sdk_version: 1.8.3
 spec:
   entrypoint: kws-train-test-pipe
   templates:
@@ -25,9 +25,9 @@ spec:
       - -c
       - (python3 -m ensurepip || python3 -m ensurepip --user) && (PIP_DISABLE_PIP_VERSION_CHECK=1
         python3 -m pip install --quiet                 --no-warn-script-location 'kserve==0.8.0'
-        'kubernetes==18.20.0' 'kfp==1.8.4' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3
+        'kubernetes==18.20.0' 'kfp==1.8.3' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3
         -m pip install --quiet                 --no-warn-script-location 'kserve==0.8.0'
-        'kubernetes==18.20.0' 'kfp==1.8.4' --user) && "$0" "$@"
+        'kubernetes==18.20.0' 'kfp==1.8.3' --user) && "$0" "$@"
       - sh
       - -ec
       - |
@@ -104,16 +104,16 @@ spec:
     metadata:
       annotations:
         pipelines.kubeflow.org/v2_component: "true"
-        pipelines.kubeflow.org/component_ref: '{"digest": "6dc68426863b7d3f48a3ddf19f4320f2607bf76896b3096fc6bc8246214ea4f3",
+        pipelines.kubeflow.org/component_ref: '{"digest": "732f5a44df8cd121c250b88e3270694f6f94a7570dd2987f4b3c4e79e9fb7468",
           "url": "components/deploy/component_SDKv2.yaml"}'
       labels:
-        pipelines.kubeflow.org/kfp_sdk_version: 1.8.4
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.3
         pipelines.kubeflow.org/pipeline-sdk-type: kfp
         pipelines.kubeflow.org/v2_component: "true"
         pipelines.kubeflow.org/enable_caching: "true"
     initContainers:
     - command: [launcher, --copy, /kfp-launcher/launch]
-      image: gcr.io/ml-pipeline/kfp-launcher:1.8.4
+      image: gcr.io/ml-pipeline/kfp-launcher:1.8.3
       name: kfp-launcher
       mirrorVolumeMounts: true
     volumes:
@@ -124,9 +124,9 @@ spec:
       - sh
       - -c
       - (python3 -m ensurepip || python3 -m ensurepip --user) && (PIP_DISABLE_PIP_VERSION_CHECK=1
-        python3 -m pip install --quiet                 --no-warn-script-location 'kfp==1.8.4'
+        python3 -m pip install --quiet                 --no-warn-script-location 'kfp==1.8.3'
         || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location
-        'kfp==1.8.4' --user) && "$0" "$@"
+        'kfp==1.8.3' --user) && "$0" "$@"
       - sh
       - -ec
       - |
@@ -209,18 +209,18 @@ spec:
     metadata:
       annotations:
         pipelines.kubeflow.org/v2_component: "true"
-        pipelines.kubeflow.org/component_ref: '{"digest": "77dd7debb663b2c8f4b064b26226e092d776a6e15f2193c575ee6e109a165f17",
+        pipelines.kubeflow.org/component_ref: '{"digest": "9ec74bf31f5fc7a27b1af807a2566c65ab197fab79a744065e67f9004eecef89",
           "url": "components/init_artifacts/component_SDKv2.yaml"}'
         pipelines.kubeflow.org/arguments.parameters: '{"config_path": "{{inputs.parameters.config_file_url}}",
           "dataset_path": "{{inputs.parameters.dataset_path}}", "version": "v0.0.1"}'
       labels:
-        pipelines.kubeflow.org/kfp_sdk_version: 1.8.4
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.3
         pipelines.kubeflow.org/pipeline-sdk-type: kfp
         pipelines.kubeflow.org/v2_component: "true"
         pipelines.kubeflow.org/enable_caching: "true"
     initContainers:
     - command: [launcher, --copy, /kfp-launcher/launch]
-      image: gcr.io/ml-pipeline/kfp-launcher:1.8.4
+      image: gcr.io/ml-pipeline/kfp-launcher:1.8.3
       name: kfp-launcher
       mirrorVolumeMounts: true
     volumes:
@@ -270,9 +270,9 @@ spec:
       - -c
       - (python3 -m ensurepip || python3 -m ensurepip --user) && (PIP_DISABLE_PIP_VERSION_CHECK=1
         python3 -m pip install --quiet                 --no-warn-script-location 'minio'
-        'ensurepip' 'kfp==1.8.4' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip
+        'ensurepip' 'kfp==1.8.3' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip
         install --quiet                 --no-warn-script-location 'minio' 'ensurepip'
-        'kfp==1.8.4' --user) && "$0" "$@"
+        'kfp==1.8.3' --user) && "$0" "$@"
       - sh
       - -ec
       - |
@@ -423,17 +423,17 @@ spec:
     metadata:
       annotations:
         pipelines.kubeflow.org/v2_component: "true"
-        pipelines.kubeflow.org/component_ref: '{"digest": "3366481d2996e2df357b396828f53ec39069ca81ead0297c56bef66cba2fe803",
+        pipelines.kubeflow.org/component_ref: '{"digest": "cf531ad129b4e58442380ce1bde3799483d6c7452a68ac1e714473728996a23d",
           "url": "components/train/component_SDKv2.yaml"}'
         pipelines.kubeflow.org/arguments.parameters: '{"model_S3_bucket": "{{inputs.parameters.model_s3_bucket}}"}'
       labels:
-        pipelines.kubeflow.org/kfp_sdk_version: 1.8.4
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.3
         pipelines.kubeflow.org/pipeline-sdk-type: kfp
         pipelines.kubeflow.org/v2_component: "true"
         pipelines.kubeflow.org/enable_caching: "true"
     initContainers:
     - command: [launcher, --copy, /kfp-launcher/launch]
-      image: gcr.io/ml-pipeline/kfp-launcher:1.8.4
+      image: gcr.io/ml-pipeline/kfp-launcher:1.8.3
       name: kfp-launcher
       mirrorVolumeMounts: true
     volumes:
