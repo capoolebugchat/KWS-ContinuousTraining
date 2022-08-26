@@ -169,5 +169,7 @@ Project Link: [https://github.com/capoolebugchat/KWS-ContinuousTraining](https:/
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://www.linkedin.com/in/quan-le-anh-6aa6a6200/
 [product-screenshot]: images/screenshot.png
+[Python.py]:https://img.shields.io/github/pipenv/locked/python-version/capoolebugchat/KWS-ContinuousTrainingKWS-ContinuousTraining
+[Python-url]: python.com
 [JQuery.com]: https://img.shields.io/badge/jQuery-0769AD?style=for-the-badge&logo=jquery&logoColor=white
 [JQuery-url]: https://jquery.com 
