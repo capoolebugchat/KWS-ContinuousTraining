@@ -174,4 +174,4 @@ Project Link: [https://github.com/capoolebugchat/KWS-ContinuousTraining](https:/
 [KFP.py]: https://img.shields.io/badge/kfp-v1.8.4-green
 [KFP-url]: https://kubeflow-pipelines.readthedocs.io/en/1.8.13/
 [KServe.py]: https://img.shields.io/badge/kserve-v0.8.0-green
-[JQuery-url]: https://kserve.github.io/website/0.8 
+[KServe-url]: https://kserve.github.io/website/0.8 
