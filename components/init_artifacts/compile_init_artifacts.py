@@ -3,14 +3,14 @@ import glob
 import yaml
 import logging
 import kfp
-import kfp.v2.dsl as dsl
-from kfp.v2.dsl import (
+import kfp.dsl as dsl
+from kfp.dsl import (
     Input, Output, Artifact, Model, Dataset,component)
 from typing import NamedTuple, Optional
 
 
 @component(
-    output_component_file="components/init_artifacts/component_SDKv2.yaml"
+    # output_component_file="components/init_artifacts/component_SDKv2.yaml"
 )
 def init_artifacts(
     config_path: str,
@@ -25,3 +25,9 @@ def init_artifacts(
        
     import os
     os.system("printenv")
+
+from kfp.compiler import Compiler
+Compiler().compile(
+    pipeline_func=init_artifacts,
+    package_path="components/init_artifacts/component_SDKv2b4.yaml"
+)

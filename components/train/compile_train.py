@@ -5,15 +5,15 @@ import glob
 import yaml
 import logging
 import kfp
-import kfp.v2.dsl as dsl
-from kfp.v2.dsl import (
+import kfp.dsl as dsl
+from kfp.dsl import (
     Input, Output, Artifact, Model, Dataset,component)
 from typing import NamedTuple
 
 @component(
-    base_image="capoolebugchat/kws-training:v0.4.0",
-    packages_to_install=["minio", "ensurepip"],
-    output_component_file="components/train/component_SDKv2.yaml"
+    base_image="capoolebugchat/kws-training:v0.6.0",
+    # packages_to_install=["minio"],
+    # output_component_file="components/train/component_SDKv2.yaml"
 )
 def train(
     model_S3_bucket: str,
@@ -59,7 +59,7 @@ def train(
 
     def _train():
         logging.info("Traning commencing.")
-        os.system("python -m kws_streaming.train.model_train_eval ds_tc_resnet --alsologtostderr")
+        os.system("python3 -m kws_streaming.train.model_train_eval ds_tc_resnet --alsologtostderr")
         logging.info("Training completed.")
 
     def _upload_local_directory_to_minio(local_path, bucket_name, minio_path):
@@ -81,7 +81,7 @@ def train(
     
     model.metadata = {
         "version":"v0.1.1",
-        "S3_URI":"S3://model-store/saved_model"
+        "S3_URI":f"S3://{model_S3_bucket}/saved_model"
         }
 
     _yaml_to_env(
@@ -95,7 +95,12 @@ def train(
         minio_path = "saved_model/1")
     
     logging.info("Model uploaded to minio bucket.")
-    
+
+from kfp.compiler import Compiler
+Compiler().compile(
+    pipeline_func=train,
+    package_path="components/train/component_SDKv2b4.yaml"
+)
 # from kfp.v2.components.component_factory import create_component_from_func
 # if __name__ == "__main__":
 #     kfp.components.create_component_from_func(

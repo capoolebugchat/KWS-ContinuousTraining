@@ -1,15 +1,16 @@
 import kfp
-import kfp.v2.dsl as dsl
-from kfp.v2.dsl import (
+import kfp.dsl as dsl
+from kfp.dsl import (
     Input, Output, Artifact, Model, Dataset,component)
 from typing import NamedTuple, Optional
+from kfp.compiler import Compiler
 
 @component(
     packages_to_install = [
-        "kserve==0.8.0",
+        "kserve==0.8.0.2",
         "kubernetes==18.20.0",
         ],
-    output_component_file = "components/deploy/component_SDKv2.yaml"
+    # output_component_file = "components/deploy/component_SDKv2.yaml"
 )
 def deploy(
     model: Input[Model],
@@ -61,3 +62,8 @@ def deploy(
         timeout_seconds = 300
         )
     logging.info("ISVC ready. Model deployed")
+
+Compiler().compile(
+    pipeline_func=deploy,
+    package_path="components/deploy/component_SDKv2b4.yaml"
+)

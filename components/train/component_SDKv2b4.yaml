@@ -1,24 +1,4 @@
 components:
-  comp-init-artifacts:
-    executorLabel: exec-init-artifacts
-    inputDefinitions:
-      parameters:
-        config_path:
-          parameterType: STRING
-        dataset_path:
-          parameterType: STRING
-        version:
-          parameterType: STRING
-    outputDefinitions:
-      artifacts:
-        train_config:
-          artifactType:
-            schemaTitle: system.Artifact
-            schemaVersion: 0.0.1
-        train_dataset:
-          artifactType:
-            schemaTitle: system.Dataset
-            schemaVersion: 0.0.1
   comp-train:
     executorLabel: exec-train
     inputDefinitions:
@@ -42,37 +22,6 @@ components:
             schemaVersion: 0.0.1
 deploymentSpec:
   executors:
-    exec-init-artifacts:
-      container:
-        args:
-        - --executor_input
-        - '{{$}}'
-        - --function_to_execute
-        - init_artifacts
-        command:
-        - sh
-        - -c
-        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
-          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet     --no-warn-script-location 'kfp==2.0.0-beta.4'\
-          \ && \"$0\" \"$@\"\n"
-        - sh
-        - -ec
-        - 'program_path=$(mktemp -d)
-
-          printf "%s" "$0" > "$program_path/ephemeral_component.py"
-
-          python3 -m kfp.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
-
-          '
-        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef init_artifacts(\n    config_path: str,\n    dataset_path: str,\n\
-          \    version: Optional[str],\n    train_config: Output[Artifact],\n    train_dataset:\
-          \ Output[Dataset],\n) -> None:\n\n    train_config.metadata = {\"version\"\
-          :version, \"local_path\":config_path}\n    train_dataset.metadata= {\"version\"\
-          :version, \"local_path\":dataset_path}\n\n    import os\n    os.system(\"\
-          printenv\")\n\n"
-        image: python:3.7
     exec-train:
       container:
         args:
@@ -138,58 +87,38 @@ deploymentSpec:
           \ to minio bucket.\")\n\n"
         image: capoolebugchat/kws-training:v0.6.0
 pipelineInfo:
-  name: kws-train-test-pipe
+  name: train
 root:
   dag:
     tasks:
-      init-artifacts:
-        cachingOptions:
-          enableCache: true
-        componentRef:
-          name: comp-init-artifacts
-        inputs:
-          parameters:
-            config_path:
-              componentInputParameter: config_file_url
-            dataset_path:
-              componentInputParameter: dataset_path
-            version:
-              runtimeValue:
-                constant: v0.0.1
-        taskInfo:
-          name: init-artifacts
       train:
         cachingOptions:
           enableCache: true
         componentRef:
           name: comp-train
-        dependentTasks:
-        - init-artifacts
         inputs:
           artifacts:
             config:
-              taskOutputArtifact:
-                outputArtifactKey: train_config
-                producerTask: init-artifacts
+              componentInputArtifact: config
             dataset:
-              taskOutputArtifact:
-                outputArtifactKey: train_dataset
-                producerTask: init-artifacts
+              componentInputArtifact: dataset
           parameters:
             model_S3_bucket:
-              componentInputParameter: model_s3_bucket
+              componentInputParameter: model_S3_bucket
         taskInfo:
           name: train
   inputDefinitions:
+    artifacts:
+      config:
+        artifactType:
+          schemaTitle: system.Artifact
+          schemaVersion: 0.0.1
+      dataset:
+        artifactType:
+          schemaTitle: system.Dataset
+          schemaVersion: 0.0.1
     parameters:
-      config_file_url:
-        defaultValue: h_param.yaml
-        parameterType: STRING
-      dataset_path:
-        defaultValue: test_dataset
-        parameterType: STRING
-      model_s3_bucket:
-        defaultValue: mlpipeline
+      model_S3_bucket:
         parameterType: STRING
 schemaVersion: 2.1.0
 sdkVersion: kfp-2.0.0-beta.4
