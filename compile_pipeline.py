@@ -5,12 +5,13 @@ from kfp.dsl import Model, Dataset, Artifact
 from kfp.compiler import Compiler
 
 init_op = load_component_from_file("components/init_artifacts/component_SDKv2b4.yaml")
+ingest_data_op = load_component_from_file("components/ingest_n_validate_data/component_SDKv2b4.yaml")
 train_op = load_component_from_file("components/train/component_SDKv2b4.yaml")
 deploy_op = load_component_from_file("components/deploy/component_SDKv2b4.yaml")
-print(train_op.__str__)
+
 @dsl.pipeline(
-    name="KWS-train-test-pipe",
-    
+    name="KWS-CT-Pipeline",
+    description="KWS auto training pipeline. Accept minio data folder, manually upload model and artifacts to minio"
 )
 def pipeline(
     config_file_url: str = "h_param.yaml",
@@ -35,3 +36,15 @@ def pipeline(
 kfp.compiler.Compiler().compile(
     pipeline_func=pipeline,
     package_path='pipeline.yaml')
+
+# local integration testing
+# from kfp.deprecated import run_pipeline_func_locally
+
+# result = run_pipeline_func_locally(
+#     pipeline_func = pipeline,
+#     arguments = {
+#         "config_file_url":"h_param.yaml",
+#         "dataset_path":"test_dataset",
+#         "model_s3_bucket":"mlpipeline"
+#     }
+# )

@@ -47,10 +47,12 @@ deploymentSpec:
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef init_artifacts(\n    config_path: str,\n    dataset_path: str,\n\
           \    version: Optional[str],\n    train_config: Output[Artifact],\n    train_dataset:\
-          \ Output[Dataset],\n) -> None:\n\n    train_config.metadata = {\"version\"\
-          :version, \"local_path\":config_path}\n    train_dataset.metadata= {\"version\"\
-          :version, \"local_path\":dataset_path}\n\n    import os\n    os.system(\"\
-          printenv\")\n\n"
+          \ Output[Dataset],\n) -> None:\n\n    import logging\n\n    logging.info(\"\
+          dataset.path:\"+train_dataset.path)\n    logging.info(train_dataset.metadata)\n\
+          \    logging.info(\"config.path:\"+train_config.path)\n    logging.info(train_config.metadata)\n\
+          \n    train_config.metadata = {\"version\":version, \"local_path\":config_path}\n\
+          \    train_dataset.metadata= {\"version\":version, \"local_path\":dataset_path}\n\
+          \n    import os\n    os.system(\"printenv\")\n\n"
         image: python:3.7
 pipelineInfo:
   name: init-artifacts

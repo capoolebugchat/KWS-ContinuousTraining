@@ -20,6 +20,13 @@ def init_artifacts(
     train_dataset: Output[Dataset],
 ) -> None:
     
+    import logging
+
+    logging.info("dataset.path:"+train_dataset.path)
+    logging.info(train_dataset.metadata)
+    logging.info("config.path:"+train_config.path)
+    logging.info(train_config.metadata)
+
     train_config.metadata = {"version":version, "local_path":config_path}
     train_dataset.metadata= {"version":version, "local_path":dataset_path}
        

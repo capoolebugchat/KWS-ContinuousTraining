@@ -27,17 +27,22 @@ def train(
     import yaml
     import os
 
-    logging.info(dataset.path)
-    logging.info(dataset.metadata)
-    logging.info(config.path)
+    logging.info("model.path:"+model.path)
     logging.info(config.metadata)
+    
+    MINIO_SERVICE_HOST="minio-service.kubeflow.svc.cluster.local"
+    MINIO_SERVICE_PORT="9000"
+    #TODO: change these to using Kubeflow's Minio Secrets
+    MINIO_SERVICE_ACCESS_KEY="minio"
+    MINIO_SERVICE_SECRET_KEY="minio123"
+    MINIO_SERVICE_SECURITY_OPTION=False
     
     from minio import Minio
     minio_client = Minio(
-        "minio-service.kubeflow.svc.cluster.local:9000",
-        access_key="minio",
-        secret_key="minio123",
-        secure=False
+        f"{MINIO_SERVICE_HOST+':'+MINIO_SERVICE_PORT}",
+        access_key = MINIO_SERVICE_ACCESS_KEY,
+        secret_key = MINIO_SERVICE_SECRET_KEY,
+        secure     = MINIO_SERVICE_SECURITY_OPTION
     )
 
     logging.info(f"connected to Minio Server at minio-service.kubeflow.svc.cluster.local:9000")
@@ -75,10 +80,7 @@ def train(
                 remote_path = remote_path.replace(
                     os.sep, "/")  # Replace \ with / on Windows
                 minio_client.fput_object(bucket_name, remote_path, local_file)
-    
-    print(config.path)
-    print(dataset.path)
-    
+        
     model.metadata = {
         "version":"v0.1.1",
         "S3_URI":f"S3://{model_S3_bucket}/saved_model"

@@ -1,3 +1,4 @@
+#deprecated script, use for training docker images (only)
 import os
 import argparse
 from minio import Minio

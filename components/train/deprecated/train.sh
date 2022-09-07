@@ -1,3 +1,5 @@
+#deprecated script, use for training docker images (only)
+
 #pre-training
 #script's args:
 # $1: yaml config file path
