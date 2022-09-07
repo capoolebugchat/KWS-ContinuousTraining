@@ -36,5 +36,5 @@ def init_artifacts(
 from kfp.compiler import Compiler
 Compiler().compile(
     pipeline_func=init_artifacts,
-    package_path="components/init_artifacts/component_SDKv2b4.yaml"
+    package_path="components/0_init_artifacts/component_SDKv2b4.yaml"
 )

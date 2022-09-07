@@ -1,6 +1,6 @@
 components:
-  comp-ingest-data-to-pipeline-root:
-    executorLabel: exec-ingest-data-to-pipeline-root
+  comp-ingest-data-to-local-dir:
+    executorLabel: exec-ingest-data-to-local-dir
     inputDefinitions:
       parameters:
         dataset_path:
@@ -15,13 +15,13 @@ components:
             schemaVersion: 0.0.1
 deploymentSpec:
   executors:
-    exec-ingest-data-to-pipeline-root:
+    exec-ingest-data-to-local-dir:
       container:
         args:
         - --executor_input
         - '{{$}}'
         - --function_to_execute
-        - ingest_data_to_pipeline_root
+        - ingest_data_to_local_dir
         command:
         - sh
         - -c
@@ -39,7 +39,7 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef ingest_data_to_pipeline_root(\n    dataset_uri: str,\n    dataset_path:\
+          \ *\n\ndef ingest_data_to_local_dir(\n    dataset_uri: str,\n    dataset_path:\
           \ str,\n    dataset: Output[Dataset],\n    # data_report: Output[Artifact]\
           \ \n):\n#-> Output[Dataset]: Actual Dataset, downloaded to root dir and\
           \ validated\n#-> Output[Artifact]: Data report: count, \n# splits, tr-words\
@@ -105,15 +105,15 @@ deploymentSpec:
           \n"
         image: python:3.7
 pipelineInfo:
-  name: ingest-data-to-pipeline-root
+  name: ingest-data-to-local-dir
 root:
   dag:
     tasks:
-      ingest-data-to-pipeline-root:
+      ingest-data-to-local-dir:
         cachingOptions:
           enableCache: true
         componentRef:
-          name: comp-ingest-data-to-pipeline-root
+          name: comp-ingest-data-to-local-dir
         inputs:
           parameters:
             dataset_path:
@@ -121,7 +121,7 @@ root:
             dataset_uri:
               componentInputParameter: dataset_uri
         taskInfo:
-          name: ingest-data-to-pipeline-root
+          name: ingest-data-to-local-dir
   inputDefinitions:
     parameters:
       dataset_path:

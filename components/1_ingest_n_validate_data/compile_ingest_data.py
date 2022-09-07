@@ -7,7 +7,7 @@ from kfp.dsl import (
     Input, Output, Artifact, Model, Dataset,component)
 
 @component
-def ingest_data_to_pipeline_root(
+def ingest_data_to_local_dir(
     dataset_uri: str,
     dataset_path: str,
     dataset: Output[Dataset],
@@ -122,8 +122,9 @@ def ingest_data_to_pipeline_root(
     dataset.metadata["origin"] = dataset_uri
     dataset.metadata["local_path"] = dataset_path
 
+
 from kfp.compiler import Compiler
 Compiler().compile(
-    pipeline_func=ingest_data_to_pipeline_root,
-    package_path="components/ingest_n_validate_data/component_SDKv2b4.yaml"
+    pipeline_func=ingest_data_to_local_dir,
+    package_path="components/1_ingest_n_validate_data/component_SDKv2b4.yaml"
 )

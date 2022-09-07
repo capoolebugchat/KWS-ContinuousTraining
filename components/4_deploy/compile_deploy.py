@@ -65,5 +65,5 @@ def deploy(
 
 Compiler().compile(
     pipeline_func=deploy,
-    package_path="components/deploy/component_SDKv2b4.yaml"
+    package_path="components/4_deploy/component_SDKv2b4.yaml"
 )

@@ -98,10 +98,11 @@ def train(
     
     logging.info("Model uploaded to minio bucket.")
 
+
 from kfp.compiler import Compiler
 Compiler().compile(
     pipeline_func=train,
-    package_path="components/train/component_SDKv2b4.yaml"
+    package_path="components/2_train/component_SDKv2b4.yaml"
 )
 # from kfp.v2.components.component_factory import create_component_from_func
 # if __name__ == "__main__":

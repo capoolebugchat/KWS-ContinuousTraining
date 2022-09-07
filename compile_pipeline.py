@@ -4,10 +4,10 @@ import kfp.dsl as dsl
 from kfp.dsl import Model, Dataset, Artifact
 from kfp.compiler import Compiler
 
-init_op = load_component_from_file("components/init_artifacts/component_SDKv2b4.yaml")
-ingest_data_op = load_component_from_file("components/ingest_n_validate_data/component_SDKv2b4.yaml")
-train_op = load_component_from_file("components/train/component_SDKv2b4.yaml")
-deploy_op = load_component_from_file("components/deploy/component_SDKv2b4.yaml")
+init_op = load_component_from_file("components/0_init_artifacts/component_SDKv2b4.yaml")
+ingest_data_op = load_component_from_file("components/1_ingest_n_validate_data/component_SDKv2b4.yaml")
+train_op = load_component_from_file("components/2_train/component_SDKv2b4.yaml")
+deploy_op = load_component_from_file("components/4_deploy/component_SDKv2b4.yaml")
 
 @dsl.pipeline(
     name="KWS-CT-Pipeline",
