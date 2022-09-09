@@ -1,6 +1,6 @@
 #build training image
 train_image_name=capoolebugchat/kws-training
-train_image_tag=v0.6.0
+train_image_tag=v0.8.0
 train_full_image_name=${train_image_name}:${train_image_tag}
 
 docker build -t "${train_full_image_name}" .

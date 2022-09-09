@@ -1,132 +1,186 @@
-components:
-  comp-ingest-data-to-local-dir:
-    executorLabel: exec-ingest-data-to-local-dir
-    inputDefinitions:
-      parameters:
-        dataset_path:
-          parameterType: STRING
-        dataset_uri:
-          parameterType: STRING
-    outputDefinitions:
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: ingest-data-to-local-dir-2-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.13, pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-09T11:12:15.429399',
+    pipelines.kubeflow.org/pipeline_spec: '{"description": "Ingest data to local dir",
+      "inputs": [{"name": "dataset_uri", "type": "String"}, {"name": "dataset_path",
+      "type": "String"}], "name": "Ingest data to local dir"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.13}
+spec:
+  entrypoint: ingest-data-to-local-dir-2
+  templates:
+  - name: ingest-data-to-local-dir
+    container:
+      args: [--executor_input, '{{$}}', --function_to_execute, ingest_data_to_local_dir]
+      command:
+      - sh
+      - -c
+      - |2
+
+        if ! [ -x "$(command -v pip)" ]; then
+            python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
+        fi
+
+        PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'kfp==1.8.13' && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp -d)
+        printf "%s" "$0" > "$program_path/ephemeral_component.py"
+        python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+      - "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing\
+        \ import *\n\ndef ingest_data_to_local_dir(\n    dataset_uri: str,\n    dataset_path:\
+        \ str,\n    dataset: Output[Dataset],\n    # data_report: Output[Artifact]\
+        \ \n):\n#-> Output[Dataset]: Actual Dataset, downloaded to root dir and validated\n\
+        #-> Output[Artifact]: Data report: count, \n# splits, tr-words count(all &\
+        \ in split), tr-words.\n\n    import logging\n    import os\n\n    MINIO_SERVICE_HOST=\"\
+        minio-service.kubeflow.svc.cluster.local\"\n    MINIO_SERVICE_PORT=\"9000\"\
+        \n    #TODO: change these to using Kubeflow's Minio Secrets\n    MINIO_SERVICE_ACCESS_KEY=\"\
+        minio\"\n    MINIO_SERVICE_SECRET_KEY=\"minio123\"\n    MINIO_SERVICE_SECURITY_OPTION=False\n\
+        \n    from minio import Minio\n    minio_client = Minio(\n        f\"{MINIO_SERVICE_HOST+':'+MINIO_SERVICE_PORT}\"\
+        ,\n        access_key = MINIO_SERVICE_ACCESS_KEY,\n        secret_key = MINIO_SERVICE_SECRET_KEY,\n\
+        \        secure     = MINIO_SERVICE_SECURITY_OPTION\n    )\n\n    def _parse_uri(uri:str):\
+        \        \n        dataset_info = {}\n\n        if uri.split(\":\")[0]==\"\
+        minio\":\n            uri_segments = uri[:8].split('/')\n            dataset_info[\"\
+        bucket_name\"] = uri_segments[0]\n            dataset_info[\"directory\"]\
+        \ = os.path.join(*uri_segments[1:])\n        else: \n            logging.info(\"\
+        wrong URI format, should be minio://bucket/folder/...\")\n        return dataset_info\n\
+        \n    def _validate_datapoint(\n        datapoint_path:Any,\n        dataset_info:\
+        \ dict\n    ):\n    #TODO: this is not optimal, consider numpy-like parrallelism\n\
+        \        datapoint_path = str(datapoint_path)\n        if \"/training/\" in\
+        \ datapoint_path: \n            dataset_info[\"train_split\"][\"count\"][\"\
+        total\"]+=1\n            if \"/trigger/\" in datapoint_path: dataset_info[\"\
+        train_split\"][\"count\"][\"trigger\"]+=1\n            elif \"/non-trigger/\"\
+        \ in datapoint_path: dataset_info[\"train_split\"][\"count\"][\"non-trigger\"\
+        ]+=1\n        elif \"/testing/\" in datapoint_path: \n            dataset_info[\"\
+        test_split\"][\"count\"][\"total\"]+=1\n            if \"/trigger/\" in datapoint_path:\
+        \ dataset_info[\"test_split\"][\"count\"][\"trigger\"]+=1\n            elif\
+        \ \"/non-trigger/\" in datapoint_path: dataset_info[\"test_split\"][\"count\"\
+        ][\"non-trigger\"]+=1\n        elif \"/validation/\" in datapoint_path: \n\
+        \            dataset_info[\"val_split\"][\"count\"][\"total\"]+=1\n      \
+        \      if \"/trigger/\" in datapoint_path: dataset_info[\"val_split\"][\"\
+        count\"][\"trigger\"]+=1\n            elif \"/non-trigger/\" in datapoint_path:\
+        \ dataset_info[\"val_split\"][\"count\"][\"non-trigger\"]+=1\n        elif\
+        \ \"_background_noise_\" in datapoint_path:\n            dataset_info[\"count\"\
+        ]+=1\n        else : \n            logging.info(f\"Not a valid datapoint,\
+        \ path: {datapoint_path}\")\n            return False\n        return True\n\
+        \n    def download_entire_dataset(\n        _uri:str,\n        local_storage_dir:str\n\
+        \        ):\n    #-> download dataset to pipeline root, all while count dataset,\
+        \ source: minio\n\n        dataset_info = _parse_uri(_uri)\n        dataset_info[\"\
+        train_split\"] = {}\n        dataset_info[\"test_split\"] = {}\n        dataset_info[\"\
+        val_split\"] = {}\n        dataset_info[\"count\"] = 0\n        dataset_info[\"\
+        train_split\"][\"count\"] = {\"total\":0, \n                             \
+        \                   \"trigger\":0, \"non-trigger\":0}\n        dataset_info[\"\
+        test_split\"][\"count\"] = {\"total\":0, \n                              \
+        \                  \"trigger\":0, \"non-trigger\":0}\n        dataset_info[\"\
+        val_split\"][\"count\"] = {\"total\":0, \n                               \
+        \                 \"trigger\":0, \"non-trigger\":0}\n\n        for item in\
+        \ minio_client.list_objects(\n            bucket_name = dataset_info[\"bucket_name\"\
+        ],\n            prefix      = dataset_info[\"directory\"],\n            recursive\
+        \   = True\n            ):\n\n            if _validate_datapoint(\n      \
+        \          datapoint_path = item.object_name,\n                dataset_info\
+        \ = dataset_info\n                ):\n\n                minio_client.fget_object(\n\
+        \                    bucket_name = dataset_info[\"bucket_name\"],\n      \
+        \              object_name = item.object_name,\n                    file_path\
+        \   = os.path.join(dataset.path,item.object_name)\n                )\n\n \
+        \           else:\n                continue\n\n        return dataset_info\n\
+        \n    logging.info(\"Start downloading and validating dataset, each sample\"\
+        )\n    dataset_info = download_entire_dataset(\n        _uri = dataset_uri,\n\
+        \        local_storage_dir = dataset_path,\n    )\n\n    dataset.name = \"\
+        AudioDataset\"\n    dataset.metadata = dataset_info\n    dataset.metadata[\"\
+        origin\"] = dataset_uri\n    dataset.metadata[\"local_path\"] = dataset_path\n\
+        \n"
+      image: python:3.7
+    inputs:
       artifacts:
-        dataset:
-          artifactType:
-            schemaTitle: system.Dataset
-            schemaVersion: 0.0.1
-deploymentSpec:
-  executors:
-    exec-ingest-data-to-local-dir:
-      container:
-        args:
-        - --executor_input
-        - '{{$}}'
-        - --function_to_execute
-        - ingest_data_to_local_dir
-        command:
-        - sh
-        - -c
-        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
-          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet     --no-warn-script-location 'kfp==2.0.0-beta.4'\
-          \ && \"$0\" \"$@\"\n"
-        - sh
-        - -ec
-        - 'program_path=$(mktemp -d)
-
-          printf "%s" "$0" > "$program_path/ephemeral_component.py"
-
-          python3 -m kfp.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
-
-          '
-        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef ingest_data_to_local_dir(\n    dataset_uri: str,\n    dataset_path:\
-          \ str,\n    dataset: Output[Dataset],\n    # data_report: Output[Artifact]\
-          \ \n):\n#-> Output[Dataset]: Actual Dataset, downloaded to root dir and\
-          \ validated\n#-> Output[Artifact]: Data report: count, \n# splits, tr-words\
-          \ count(all & in split), tr-words.\n\n    import logging\n    import os\n\
-          \n    MINIO_SERVICE_HOST=\"minio-service.kubeflow.svc.cluster.local\"\n\
-          \    MINIO_SERVICE_PORT=\"9000\"\n    #TODO: change these to using Kubeflow's\
-          \ Minio Secrets\n    MINIO_SERVICE_ACCESS_KEY=\"minio\"\n    MINIO_SERVICE_SECRET_KEY=\"\
-          minio123\"\n    MINIO_SERVICE_SECURITY_OPTION=False\n\n    from minio import\
-          \ Minio\n    minio_client = Minio(\n        f\"{MINIO_SERVICE_HOST+':'+MINIO_SERVICE_PORT}\"\
-          ,\n        access_key = MINIO_SERVICE_ACCESS_KEY,\n        secret_key =\
-          \ MINIO_SERVICE_SECRET_KEY,\n        secure     = MINIO_SERVICE_SECURITY_OPTION\n\
-          \    )\n\n    def _parse_uri(uri:str):        \n        dataset_info = {}\n\
-          \n        if uri.split(\":\")[0]==\"minio\":\n            uri_segments =\
-          \ uri[:8].split('/')\n            dataset_info[\"bucket_name\"] = uri_segments[0]\n\
-          \            dataset_info[\"directory\"] = os.path.join(*uri_segments[1:])\n\
-          \        else: \n            logging.info(\"wrong URI format, should be\
-          \ minio://bucket/folder/...\")\n        return dataset_info\n\n    def _validate_datapoint(\n\
-          \        datapoint_path:Any,\n        dataset_info: dict\n    ):\n    #TODO:\
-          \ this is not optimal, consider numpy-like parrallelism\n        datapoint_path\
-          \ = str(datapoint_path)\n        if \"/training/\" in datapoint_path: \n\
-          \            dataset_info[\"train_split\"][\"count\"][\"total\"]+=1\n  \
-          \          if \"/trigger/\" in datapoint_path: dataset_info[\"train_split\"\
-          ][\"count\"][\"trigger\"]+=1\n            elif \"/non-trigger/\" in datapoint_path:\
-          \ dataset_info[\"train_split\"][\"count\"][\"non-trigger\"]+=1\n       \
-          \ elif \"/testing/\" in datapoint_path: \n            dataset_info[\"test_split\"\
-          ][\"count\"][\"total\"]+=1\n            if \"/trigger/\" in datapoint_path:\
-          \ dataset_info[\"test_split\"][\"count\"][\"trigger\"]+=1\n            elif\
-          \ \"/non-trigger/\" in datapoint_path: dataset_info[\"test_split\"][\"count\"\
-          ][\"non-trigger\"]+=1\n        elif \"/validation/\" in datapoint_path:\
-          \ \n            dataset_info[\"val_split\"][\"count\"][\"total\"]+=1\n \
-          \           if \"/trigger/\" in datapoint_path: dataset_info[\"val_split\"\
-          ][\"count\"][\"trigger\"]+=1\n            elif \"/non-trigger/\" in datapoint_path:\
-          \ dataset_info[\"val_split\"][\"count\"][\"non-trigger\"]+=1\n        elif\
-          \ \"_background_noise_\" in datapoint_path:\n            dataset_info[\"\
-          count\"]+=1\n        else : \n            logging.info(f\"Not a valid datapoint,\
-          \ path: {datapoint_path}\")\n            return False\n        return True\n\
-          \n    def download_entire_dataset(\n        _uri:str,\n        local_storage_dir:str\n\
-          \        ):\n    #-> download dataset to pipeline root, all while count\
-          \ dataset, source: minio\n\n        dataset_info = _parse_uri(_uri)\n  \
-          \      dataset_info[\"train_split\"] = {}\n        dataset_info[\"test_split\"\
-          ] = {}\n        dataset_info[\"val_split\"] = {}\n        dataset_info[\"\
-          count\"] = 0\n        dataset_info[\"train_split\"][\"count\"] = {\"total\"\
-          :0, \n                                                \"trigger\":0, \"\
-          non-trigger\":0}\n        dataset_info[\"test_split\"][\"count\"] = {\"\
-          total\":0, \n                                                \"trigger\"\
-          :0, \"non-trigger\":0}\n        dataset_info[\"val_split\"][\"count\"] =\
-          \ {\"total\":0, \n                                                \"trigger\"\
-          :0, \"non-trigger\":0}\n\n        for item in minio_client.list_objects(\n\
-          \            bucket_name = dataset_info[\"bucket_name\"],\n            prefix\
-          \      = dataset_info[\"directory\"],\n            recursive   = True\n\
-          \            ):\n\n            if _validate_datapoint(\n               \
-          \ datapoint_path = item.object_name,\n                dataset_info = dataset_info\n\
-          \                ):\n\n                minio_client.fget_object(\n     \
-          \               bucket_name = dataset_info[\"bucket_name\"],\n         \
-          \           object_name = item.object_name,\n                    file_path\
-          \   = os.path.join(dataset.path,item.object_name)\n                )\n\n\
-          \            else:\n                continue\n\n        return dataset_info\n\
-          \n    logging.info(\"Start downloading and validating dataset, each sample\"\
-          )\n    dataset_info = download_entire_dataset(\n        _uri = dataset_uri,\n\
-          \        local_storage_dir = dataset_path,\n    )\n\n    dataset.name =\
-          \ \"AudioDataset\"\n    dataset.metadata = dataset_info\n    dataset.metadata[\"\
-          origin\"] = dataset_uri\n    dataset.metadata[\"local_path\"] = dataset_path\n\
-          \n"
-        image: python:3.7
-pipelineInfo:
-  name: ingest-data-to-local-dir
-root:
-  dag:
-    tasks:
-      ingest-data-to-local-dir:
-        cachingOptions:
-          enableCache: true
-        componentRef:
-          name: comp-ingest-data-to-local-dir
-        inputs:
-          parameters:
-            dataset_path:
-              componentInputParameter: dataset_path
-            dataset_uri:
-              componentInputParameter: dataset_uri
-        taskInfo:
-          name: ingest-data-to-local-dir
-  inputDefinitions:
+      - {name: dataset_path, path: /tmp/inputs/dataset_path/data}
+      - {name: dataset_uri, path: /tmp/inputs/dataset_uri/data}
+    outputs:
+      artifacts:
+      - {name: ingest-data-to-local-dir-dataset, path: /tmp/outputs/dataset/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--executor_input", {"executorInput": null}, "--function_to_execute",
+          "ingest_data_to_local_dir"], "command": ["sh", "-c", "\nif ! [ -x \"$(command
+          -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user
+          || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3
+          -m pip install --quiet     --no-warn-script-location ''kfp==1.8.13'' &&
+          \"$0\" \"$@\"\n", "sh", "-ec", "program_path=$(mktemp -d)\nprintf \"%s\"
+          \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+          "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing
+          import *\n\ndef ingest_data_to_local_dir(\n    dataset_uri: str,\n    dataset_path:
+          str,\n    dataset: Output[Dataset],\n    # data_report: Output[Artifact]
+          \n):\n#-> Output[Dataset]: Actual Dataset, downloaded to root dir and validated\n#->
+          Output[Artifact]: Data report: count, \n# splits, tr-words count(all & in
+          split), tr-words.\n\n    import logging\n    import os\n\n    MINIO_SERVICE_HOST=\"minio-service.kubeflow.svc.cluster.local\"\n    MINIO_SERVICE_PORT=\"9000\"\n    #TODO:
+          change these to using Kubeflow''s Minio Secrets\n    MINIO_SERVICE_ACCESS_KEY=\"minio\"\n    MINIO_SERVICE_SECRET_KEY=\"minio123\"\n    MINIO_SERVICE_SECURITY_OPTION=False\n\n    from
+          minio import Minio\n    minio_client = Minio(\n        f\"{MINIO_SERVICE_HOST+'':''+MINIO_SERVICE_PORT}\",\n        access_key
+          = MINIO_SERVICE_ACCESS_KEY,\n        secret_key = MINIO_SERVICE_SECRET_KEY,\n        secure     =
+          MINIO_SERVICE_SECURITY_OPTION\n    )\n\n    def _parse_uri(uri:str):        \n        dataset_info
+          = {}\n\n        if uri.split(\":\")[0]==\"minio\":\n            uri_segments
+          = uri[:8].split(''/'')\n            dataset_info[\"bucket_name\"] = uri_segments[0]\n            dataset_info[\"directory\"]
+          = os.path.join(*uri_segments[1:])\n        else: \n            logging.info(\"wrong
+          URI format, should be minio://bucket/folder/...\")\n        return dataset_info\n\n    def
+          _validate_datapoint(\n        datapoint_path:Any,\n        dataset_info:
+          dict\n    ):\n    #TODO: this is not optimal, consider numpy-like parrallelism\n        datapoint_path
+          = str(datapoint_path)\n        if \"/training/\" in datapoint_path: \n            dataset_info[\"train_split\"][\"count\"][\"total\"]+=1\n            if
+          \"/trigger/\" in datapoint_path: dataset_info[\"train_split\"][\"count\"][\"trigger\"]+=1\n            elif
+          \"/non-trigger/\" in datapoint_path: dataset_info[\"train_split\"][\"count\"][\"non-trigger\"]+=1\n        elif
+          \"/testing/\" in datapoint_path: \n            dataset_info[\"test_split\"][\"count\"][\"total\"]+=1\n            if
+          \"/trigger/\" in datapoint_path: dataset_info[\"test_split\"][\"count\"][\"trigger\"]+=1\n            elif
+          \"/non-trigger/\" in datapoint_path: dataset_info[\"test_split\"][\"count\"][\"non-trigger\"]+=1\n        elif
+          \"/validation/\" in datapoint_path: \n            dataset_info[\"val_split\"][\"count\"][\"total\"]+=1\n            if
+          \"/trigger/\" in datapoint_path: dataset_info[\"val_split\"][\"count\"][\"trigger\"]+=1\n            elif
+          \"/non-trigger/\" in datapoint_path: dataset_info[\"val_split\"][\"count\"][\"non-trigger\"]+=1\n        elif
+          \"_background_noise_\" in datapoint_path:\n            dataset_info[\"count\"]+=1\n        else
+          : \n            logging.info(f\"Not a valid datapoint, path: {datapoint_path}\")\n            return
+          False\n        return True\n\n    def download_entire_dataset(\n        _uri:str,\n        local_storage_dir:str\n        ):\n    #->
+          download dataset to pipeline root, all while count dataset, source: minio\n\n        dataset_info
+          = _parse_uri(_uri)\n        dataset_info[\"train_split\"] = {}\n        dataset_info[\"test_split\"]
+          = {}\n        dataset_info[\"val_split\"] = {}\n        dataset_info[\"count\"]
+          = 0\n        dataset_info[\"train_split\"][\"count\"] = {\"total\":0, \n                                                \"trigger\":0,
+          \"non-trigger\":0}\n        dataset_info[\"test_split\"][\"count\"] = {\"total\":0,
+          \n                                                \"trigger\":0, \"non-trigger\":0}\n        dataset_info[\"val_split\"][\"count\"]
+          = {\"total\":0, \n                                                \"trigger\":0,
+          \"non-trigger\":0}\n\n        for item in minio_client.list_objects(\n            bucket_name
+          = dataset_info[\"bucket_name\"],\n            prefix      = dataset_info[\"directory\"],\n            recursive   =
+          True\n            ):\n\n            if _validate_datapoint(\n                datapoint_path
+          = item.object_name,\n                dataset_info = dataset_info\n                ):\n\n                minio_client.fget_object(\n                    bucket_name
+          = dataset_info[\"bucket_name\"],\n                    object_name = item.object_name,\n                    file_path   =
+          os.path.join(dataset.path,item.object_name)\n                )\n\n            else:\n                continue\n\n        return
+          dataset_info\n\n    logging.info(\"Start downloading and validating dataset,
+          each sample\")\n    dataset_info = download_entire_dataset(\n        _uri
+          = dataset_uri,\n        local_storage_dir = dataset_path,\n    )\n\n    dataset.name
+          = \"AudioDataset\"\n    dataset.metadata = dataset_info\n    dataset.metadata[\"origin\"]
+          = dataset_uri\n    dataset.metadata[\"local_path\"] = dataset_path\n\n"],
+          "image": "python:3.7"}}, "inputs": [{"name": "dataset_uri", "type": "String"},
+          {"name": "dataset_path", "type": "String"}], "name": "Ingest data to local
+          dir", "outputs": [{"name": "dataset", "type": "Dataset"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  - name: ingest-data-to-local-dir-2
+    inputs:
+      artifacts:
+      - {name: dataset_path}
+      - {name: dataset_uri}
+    dag:
+      tasks:
+      - name: ingest-data-to-local-dir
+        template: ingest-data-to-local-dir
+        arguments:
+          artifacts:
+          - {name: dataset_path, from: '{{inputs.artifacts.dataset_path}}'}
+          - {name: dataset_uri, from: '{{inputs.artifacts.dataset_uri}}'}
+  arguments:
     parameters:
-      dataset_path:
-        parameterType: STRING
-      dataset_uri:
-        parameterType: STRING
-schemaVersion: 2.1.0
-sdkVersion: kfp-2.0.0-beta.4
+    - {name: dataset_uri}
+    - {name: dataset_path}
+    artifacts:
+    - name: dataset_uri
+      raw: {data: '{{workflow.parameters.dataset_uri}}'}
+    - name: dataset_path
+      raw: {data: '{{workflow.parameters.dataset_path}}'}
+  serviceAccountName: pipeline-runner

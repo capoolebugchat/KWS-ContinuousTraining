@@ -6,7 +6,7 @@ from kfp.v2.dsl import (
 
 def register_model_to_S3(
     model: Input[Model]
-):
+) -> None:
     
     import minio
 

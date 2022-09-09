@@ -2,8 +2,8 @@ from importlib.resources import path
 from re import L
 from typing import Any
 import kfp
-import kfp.dsl as dsl
-from kfp.dsl import (
+import kfp.v2.dsl as dsl
+from kfp.v2.dsl import (
     Input, Output, Artifact, Model, Dataset,component)
 
 @component
