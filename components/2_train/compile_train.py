@@ -75,6 +75,16 @@ def train(
                 env_f.write(f"{key} = '{hyperparams[key]}'\n")
             else: env_f.write(f"{key} = {hyperparams[key]}\n")
 
+    def _mount() -> None:
+        
+        import os
+        # _create_rclone_config()
+        dir = dataset.metadata["local_path"]
+        os.system(f"mkdir {dir}")
+        os.system(f"rclone mount kf_minio:/pipeline {dir} \
+            --daemon --log-file rclone.log \
+            --config rclone.conf -vv")
+
     def _train():
         logging.info("Traning commencing.")
         os.system("python3 -m kws_streaming.train.model_train_eval ds_tc_resnet --alsologtostderr")

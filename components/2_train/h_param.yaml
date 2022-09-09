@@ -1,5 +1,5 @@
 wanted_words: 'non_trigger,trigger'
-data_path: 'data'
+data_path: 'train_dataset'
 train_res: 'train_res/ds_tc_resnet/'
 split_data: 0
 

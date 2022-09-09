@@ -44,7 +44,7 @@ def validate_dataset_from_Minio(
     dataset.metadata["origin"] = dataset_minio_uri
     dataset.metadata["local_path"] = "/dataset"    
     logging.info(os.listdir())
-    
+
     def _create_rclone_config() -> None:
         
         with open("rclone.conf", 'w') as conf_file:
@@ -59,19 +59,15 @@ def validate_dataset_from_Minio(
             
         logging.info("configuration file written")
 
-    def _mount():
+    def _mount() -> None:
         
         import os
         _create_rclone_config()
-        os.system( \
-            f"rclone mount kf_minio://test-training-data/test-train-dataset {dataset.metadata['local_path']} \
-            --config rclone.conf \
-            --allow-other \
-            --log-file rclone.log \
-            --vfs-cache-mode full \
-            -vv \
-            --daemon"
-        )
+        dir = dataset.metadata["local_path"]
+        os.system(f"mkdir {dir}")
+        os.system(f"rclone mount kf_minio:mlpipeline/pipeline {dir} \
+            --daemon --log-file rclone.log \
+            --config rclone.conf -vv")
 
     def _parse_uri(uri:str):        
         dataset_info = {}
