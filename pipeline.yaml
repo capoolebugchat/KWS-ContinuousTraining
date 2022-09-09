@@ -4,14 +4,12 @@ metadata:
   generateName: kws-ct-pipeline-
   annotations:
     pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
-    pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-09T11:12:17.075618'
+    pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-09T15:20:44.580834'
     pipelines.kubeflow.org/pipeline_spec: '{"description": "KWS auto training pipeline.
       Accept minio data folder, manually upload model and artifacts to minio", "inputs":
-      [{"default": "h_param.yaml", "name": "config_file_url", "optional": true, "type":
-      "String"}, {"default": "test_dataset", "name": "dataset_path", "optional": true,
-      "type": "String"}, {"default": "mlpipeline", "name": "model_s3_bucket", "optional":
-      true, "type": "String"}, {"default": "", "name": "pipeline-root"}, {"default":
-      "pipeline/KWS-CT-Pipeline", "name": "pipeline-name"}], "name": "KWS-CT-Pipeline"}'
+      [{"default": "test_dataset", "name": "dataset_uri", "optional": true, "type":
+      "String"}, {"default": "", "name": "pipeline-root"}, {"default": "pipeline/KWS-CT-Pipeline",
+      "name": "pipeline-name"}], "name": "KWS-CT-Pipeline"}'
     pipelines.kubeflow.org/v2_pipeline: "true"
   labels:
     pipelines.kubeflow.org/v2_pipeline: "true"
@@ -19,159 +17,22 @@ metadata:
 spec:
   entrypoint: kws-ct-pipeline
   templates:
-  - name: init-artifacts
-    container:
-      args:
-      - sh
-      - -c
-      - |2
-
-        if ! [ -x "$(command -v pip)" ]; then
-            python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
-        fi
-
-        PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'kfp==1.8.13' && "$0" "$@"
-      - sh
-      - -ec
-      - |
-        program_path=$(mktemp -d)
-        printf "%s" "$0" > "$program_path/ephemeral_component.py"
-        python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
-      - |2+
-
-        import kfp
-        from kfp.v2 import dsl
-        from kfp.v2.dsl import *
-        from typing import *
-
-        def init_artifacts(
-            config_path: str,
-            dataset_path: str,
-            version: Optional[str],
-            train_dataset: Output[Dataset],
-            train_config: Output[Artifact]
-        ):
-
-            import logging
-            import os
-
-            os.listdir()
-
-            os.listdir("/")
-            logging.info("dataset.path:"+train_dataset.path)
-            logging.info(train_dataset.metadata)
-            logging.info("config.path:"+train_config.path)
-            logging.info(train_config.metadata)
-
-            train_config.metadata = {"version":version, "local_path":config_path}
-            train_dataset.metadata= {"version":version, "local_path":dataset_path}
-
-            import os
-            os.system("printenv")
-
-      - --executor_input
-      - '{{$}}'
-      - --function_to_execute
-      - init_artifacts
-      command: [/kfp-launcher/launch, --mlmd_server_address, $(METADATA_GRPC_SERVICE_HOST),
-        --mlmd_server_port, $(METADATA_GRPC_SERVICE_PORT), --runtime_info_json, $(KFP_V2_RUNTIME_INFO),
-        --container_image, $(KFP_V2_IMAGE), --task_name, init-artifacts, --pipeline_name,
-        '{{inputs.parameters.pipeline-name}}', --run_id, $(KFP_RUN_ID), --run_resource,
-        workflows.argoproj.io/$(WORKFLOW_ID), --namespace, $(KFP_NAMESPACE), --pod_name,
-        $(KFP_POD_NAME), --pod_uid, $(KFP_POD_UID), --pipeline_root, '{{inputs.parameters.pipeline-root}}',
-        --enable_caching, $(ENABLE_CACHING), --, 'config_path={{inputs.parameters.config_file_url}}',
-        'dataset_path={{inputs.parameters.dataset_path}}', version=v0.0.1, --]
-      env:
-      - name: KFP_POD_NAME
-        valueFrom:
-          fieldRef: {fieldPath: metadata.name}
-      - name: KFP_POD_UID
-        valueFrom:
-          fieldRef: {fieldPath: metadata.uid}
-      - name: KFP_NAMESPACE
-        valueFrom:
-          fieldRef: {fieldPath: metadata.namespace}
-      - name: WORKFLOW_ID
-        valueFrom:
-          fieldRef: {fieldPath: 'metadata.labels[''workflows.argoproj.io/workflow'']'}
-      - name: KFP_RUN_ID
-        valueFrom:
-          fieldRef: {fieldPath: 'metadata.labels[''pipeline/runid'']'}
-      - name: ENABLE_CACHING
-        valueFrom:
-          fieldRef: {fieldPath: 'metadata.labels[''pipelines.kubeflow.org/enable_caching'']'}
-      - {name: KFP_V2_IMAGE, value: 'python:3.7'}
-      - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {"config_path": {"type":
-          "STRING"}, "dataset_path": {"type": "STRING"}, "version": {"type": "STRING"}},
-          "inputArtifacts": {}, "outputParameters": {}, "outputArtifacts": {"train_config":
-          {"schemaTitle": "system.Artifact", "instanceSchema": "", "schemaVersion":
-          "0.0.1", "metadataPath": "/tmp/outputs/train_config/data"}, "train_dataset":
-          {"schemaTitle": "system.Dataset", "instanceSchema": "", "schemaVersion":
-          "0.0.1", "metadataPath": "/tmp/outputs/train_dataset/data"}}}'}
-      envFrom:
-      - configMapRef: {name: metadata-grpc-configmap, optional: true}
-      image: python:3.7
-      volumeMounts:
-      - {mountPath: /kfp-launcher, name: kfp-launcher}
-    inputs:
-      parameters:
-      - {name: config_file_url}
-      - {name: dataset_path}
-      - {name: pipeline-name}
-      - {name: pipeline-root}
-    outputs:
-      artifacts:
-      - {name: init-artifacts-train_config, path: /tmp/outputs/train_config/data}
-      - {name: init-artifacts-train_dataset, path: /tmp/outputs/train_dataset/data}
-    metadata:
-      annotations:
-        pipelines.kubeflow.org/v2_component: "true"
-        pipelines.kubeflow.org/component_ref: '{"digest": "b3d7415866a836dc46d500c7504b12ebac7713cbf2b9b00fe119de3f7d5cc11c",
-          "url": "components/0_init_artifacts/component_SDKv2.yaml"}'
-        pipelines.kubeflow.org/arguments.parameters: '{"config_path": "{{inputs.parameters.config_file_url}}",
-          "dataset_path": "{{inputs.parameters.dataset_path}}", "version": "v0.0.1"}'
-      labels:
-        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
-        pipelines.kubeflow.org/pipeline-sdk-type: kfp
-        pipelines.kubeflow.org/v2_component: "true"
-        pipelines.kubeflow.org/enable_caching: "true"
-    initContainers:
-    - command: [launcher, --copy, /kfp-launcher/launch]
-      image: gcr.io/ml-pipeline/kfp-launcher:1.8.7
-      name: kfp-launcher
-      mirrorVolumeMounts: true
-    volumes:
-    - {name: kfp-launcher}
   - name: kws-ct-pipeline
     inputs:
       parameters:
-      - {name: config_file_url}
-      - {name: dataset_path}
-      - {name: model_s3_bucket}
+      - {name: dataset_uri}
       - {name: pipeline-name}
       - {name: pipeline-root}
     dag:
       tasks:
-      - name: init-artifacts
-        template: init-artifacts
+      - name: validate-dataset-from-minio
+        template: validate-dataset-from-minio
         arguments:
           parameters:
-          - {name: config_file_url, value: '{{inputs.parameters.config_file_url}}'}
-          - {name: dataset_path, value: '{{inputs.parameters.dataset_path}}'}
+          - {name: dataset_uri, value: '{{inputs.parameters.dataset_uri}}'}
           - {name: pipeline-name, value: '{{inputs.parameters.pipeline-name}}'}
           - {name: pipeline-root, value: '{{inputs.parameters.pipeline-root}}'}
-      - name: train
-        template: train
-        dependencies: [init-artifacts]
-        arguments:
-          parameters:
-          - {name: model_s3_bucket, value: '{{inputs.parameters.model_s3_bucket}}'}
-          - {name: pipeline-name, value: '{{inputs.parameters.pipeline-name}}'}
-          - {name: pipeline-root, value: '{{inputs.parameters.pipeline-root}}'}
-          artifacts:
-          - {name: init-artifacts-train_config, from: '{{tasks.init-artifacts.outputs.artifacts.init-artifacts-train_config}}'}
-          - {name: init-artifacts-train_dataset, from: '{{tasks.init-artifacts.outputs.artifacts.init-artifacts-train_dataset}}'}
-  - name: train
+  - name: validate-dataset-from-minio
     container:
       args:
       - sh
@@ -182,127 +43,100 @@ spec:
             python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
         fi
 
-        PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'kfp==1.8.13' && "$0" "$@"
+        PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'minio' 'kfp==1.8.13' && "$0" "$@"
       - sh
       - -ec
       - |
         program_path=$(mktemp -d)
         printf "%s" "$0" > "$program_path/ephemeral_component.py"
         python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
-      - |2+
-
-        import kfp
-        from kfp.v2 import dsl
-        from kfp.v2.dsl import *
-        from typing import *
-
-        def train(
-            model_S3_bucket: str,
-            dataset: Input[Dataset],
-            config: Input[Artifact],
-            model: Output[Model]
-        ) -> None:
-
-            import logging
-            import glob
-            import yaml
-            import os
-
-            logging.info("model path:"+model.path)
-            logging.info("model URI:"+model.uri)
-
-            MINIO_SERVICE_HOST="minio-service.kubeflow.svc.cluster.local"
-            MINIO_SERVICE_PORT="9000"
-            #TODO: change these to using Kubeflow's Minio Secrets
-            MINIO_SERVICE_ACCESS_KEY="minio"
-            MINIO_SERVICE_SECRET_KEY="minio123"
-            MINIO_SERVICE_SECURITY_OPTION=False
-
-            from minio import Minio
-            minio_client = Minio(
-                f"{MINIO_SERVICE_HOST+':'+MINIO_SERVICE_PORT}",
-                access_key = MINIO_SERVICE_ACCESS_KEY,
-                secret_key = MINIO_SERVICE_SECRET_KEY,
-                secure     = MINIO_SERVICE_SECURITY_OPTION
-            )
-
-            logging.info(f"Connected to Minio Server at {MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}")
-
-            logging.info(f"{os.listdir}")
-            os.system( \
-                f"rclone mount kf_minio://test-training-data/test-train-dataset {dataset.metadata['local_path']} \
-                --config ./rclone.conf \
-                --allow-other \
-                --log-file rclone.log \
-                --vfs-cache-mode full \
-                -vv \
-                --daemon"
-            )
-
-            logging.info("Mounted rclone training data folder")
-
-            def _yaml_to_env(yaml_file, env_file, data_path):
-
-                yaml_f = open(yaml_file,'r')
-                env_f = open(env_file,'w')
-                hyperparams = yaml.safe_load(yaml_f)
-                hyperparams['data_path'] = data_path
-                logging.info("Loading hyperparams:")
-                print("Loading hyperparams:")
-                for key in hyperparams:
-                    logging.info(f"{key} = {hyperparams[key]}")
-                    print(f"{key} = {hyperparams[key]}")
-                    if isinstance(hyperparams[key], str):
-                        env_f.write(f"{key} = '{hyperparams[key]}'\n")
-                    else: env_f.write(f"{key} = {hyperparams[key]}\n")
-
-            def _train():
-                logging.info("Traning commencing.")
-                os.system("python3 -m kws_streaming.train.model_train_eval ds_tc_resnet --alsologtostderr")
-                logging.info("Training completed.")
-
-            def _upload_local_directory_to_minio(local_path, bucket_name, minio_path):
-                assert os.path.isdir(local_path)
-                for local_file in glob.glob(local_path + '/**'):
-                    local_file = local_file.replace(os.sep, "/") # Replace \ with / on Windows
-                    if not os.path.isfile(local_file):
-                        _upload_local_directory_to_minio(
-                            local_file, bucket_name, minio_path + "/" + os.path.basename(local_file))
-                    else:
-                        remote_path = os.path.join(
-                            minio_path, local_file[1 + len(local_path):])
-                        remote_path = remote_path.replace(
-                            os.sep, "/")  # Replace \ with / on Windows
-                        minio_client.fput_object(bucket_name, remote_path, local_file)
-
-            model.metadata = {
-                "version":"v0.1.1",
-                "S3_URI":f"S3://{model_S3_bucket}/saved_model"
-                }
-
-            _yaml_to_env(
-                yaml_file = config.metadata["local_path"],
-                env_file = "hparam.env",
-                data_path = dataset.metadata["local_path"])
-            _train()
-            _upload_local_directory_to_minio(
-                local_path = "./train_res/ds_tc_resnet/non_stream",
-                bucket_name = model_S3_bucket,
-                minio_path = "saved_model/1")
-
-            logging.info("Model uploaded to minio bucket.")
-
+      - "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing\
+        \ import *\n\ndef validate_dataset_from_Minio(\n    dataset_minio_uri: str,\n\
+        \    dataset: Output[Dataset],\n    # data_report: Output[Artifact] \n):\n\
+        \    \"\"\" \n    -> Output[Dataset]: Actual Dataset, downloaded to root dir\
+        \ and validated\n    -> Output[Artifact]: Data report: count, \n    splits,\
+        \ tr-words count(all & in split), tr-words.\n    \"\"\"\n\n    import logging\n\
+        \    import os\n\n    MINIO_SERVICE_HOST=\"minio-service.kubeflow.svc.cluster.local\"\
+        \n    MINIO_SERVICE_PORT=\"9000\"\n\n    #TODO: change these to using Kubeflow's\
+        \ Minio Secrets\n    MINIO_SERVICE_ACCESS_KEY=\"minio\"\n    MINIO_SERVICE_SECRET_KEY=\"\
+        minio123\"\n    MINIO_SERVICE_SECURITY_OPTION=False\n\n    from minio import\
+        \ Minio\n    minio_client = Minio(\n        f\"{MINIO_SERVICE_HOST+':'+MINIO_SERVICE_PORT}\"\
+        ,\n        access_key = MINIO_SERVICE_ACCESS_KEY,\n        secret_key = MINIO_SERVICE_SECRET_KEY,\n\
+        \        secure     = MINIO_SERVICE_SECURITY_OPTION\n    )\n\n    os.mkdir(\"\
+        /dataset\")\n    dataset.metadata[\"origin\"] = dataset_minio_uri\n    dataset.metadata[\"\
+        local_path\"] = \"/dataset\"    \n\n    def _create_rclone_config():\n\n \
+        \       with open(\"rclone.conf\", 'w') as conf_file:\n\n            conf_file.write(\"\
+        [kf_minio]\\n\")\n            conf_file.write(\"type=s3\\n\")\n          \
+        \  conf_file.write(\"provider = minio\\n\")\n            conf_file.write(f\"\
+        env_auth = {MINIO_SERVICE_SECURITY_OPTION}\\n\")\n            conf_file.write(f\"\
+        access_key_id = {MINIO_SERVICE_ACCESS_KEY}\\n\")\n            conf_file.write(f\"\
+        secret_access_key = {MINIO_SERVICE_SECRET_KEY}\\n\")\n            conf_file.write(f\"\
+        endpoint = https://{MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}/\")\n\n     \
+        \   logging.info(\"configuration file written\")\n\n    def _mount():\n\n\
+        \        import os\n        _create_rclone_config()\n        os.system( \\\
+        \n            f\"rclone mount kf_minio://test-training-data/test-train-dataset\
+        \ {dataset.metadata['local_path']} \\\n            --config rclone.conf \\\
+        \n            --allow-other \\\n            --log-file rclone.log \\\n   \
+        \         --vfs-cache-mode full \\\n            -vv \\\n            --daemon\"\
+        \n        )\n\n\n    def _parse_uri(uri:str):        \n        dataset_info\
+        \ = {}\n\n        if uri.split(\":\")[0]==\"minio\":\n            uri_segments\
+        \ = uri[:8].split('/')\n            dataset_info[\"bucket_name\"] = uri_segments[0]\n\
+        \            dataset_info[\"directory\"] = os.path.join(*uri_segments[1:])\n\
+        \        else: \n            logging.info(\"wrong URI format, should be minio://bucket/folder/...\"\
+        )\n        return dataset_info\n\n    def _validate_datapoint(\n        datapoint_path:Any,\n\
+        \        dataset_info: dict\n    ):\n    #TODO: this is not optimal, consider\
+        \ numpy-like parrallelism\n        datapoint_path = str(datapoint_path)\n\
+        \        if \"/training/\" in datapoint_path: \n            dataset_info[\"\
+        train_split\"][\"count\"][\"total\"]+=1\n            if \"/trigger/\" in datapoint_path:\
+        \ dataset_info[\"train_split\"][\"count\"][\"trigger\"]+=1\n            elif\
+        \ \"/non-trigger/\" in datapoint_path: dataset_info[\"train_split\"][\"count\"\
+        ][\"non-trigger\"]+=1\n        elif \"/testing/\" in datapoint_path: \n  \
+        \          dataset_info[\"test_split\"][\"count\"][\"total\"]+=1\n       \
+        \     if \"/trigger/\" in datapoint_path: dataset_info[\"test_split\"][\"\
+        count\"][\"trigger\"]+=1\n            elif \"/non-trigger/\" in datapoint_path:\
+        \ dataset_info[\"test_split\"][\"count\"][\"non-trigger\"]+=1\n        elif\
+        \ \"/validation/\" in datapoint_path: \n            dataset_info[\"val_split\"\
+        ][\"count\"][\"total\"]+=1\n            if \"/trigger/\" in datapoint_path:\
+        \ dataset_info[\"val_split\"][\"count\"][\"trigger\"]+=1\n            elif\
+        \ \"/non-trigger/\" in datapoint_path: dataset_info[\"val_split\"][\"count\"\
+        ][\"non-trigger\"]+=1\n        elif \"_background_noise_\" in datapoint_path:\n\
+        \            dataset_info[\"count\"]+=1\n        else : \n            logging.info(f\"\
+        Not a valid datapoint, path: {datapoint_path}\")\n            return False\n\
+        \        return True\n\n    def validate_dataset(\n        _uri:str,\n   \
+        \     # local_storage_dir:str\n        ):\n    #-> download dataset to pipeline\
+        \ root, all while count dataset, source: minio\n\n        dataset_info = _parse_uri(_uri)\n\
+        \        dataset_info[\"train_split\"] = {}\n        dataset_info[\"test_split\"\
+        ] = {}\n        dataset_info[\"val_split\"] = {}\n        dataset_info[\"\
+        count\"] = 0\n        dataset_info[\"train_split\"][\"count\"] = {\"total\"\
+        :0, \n                                                \"trigger\":0, \"non-trigger\"\
+        :0}\n        dataset_info[\"test_split\"][\"count\"] = {\"total\":0, \n  \
+        \                                              \"trigger\":0, \"non-trigger\"\
+        :0}\n        dataset_info[\"val_split\"][\"count\"] = {\"total\":0, \n   \
+        \                                             \"trigger\":0, \"non-trigger\"\
+        :0}\n\n        for item in minio_client.list_objects(\n            bucket_name\
+        \ = dataset_info[\"bucket_name\"],\n            prefix      = dataset_info[\"\
+        directory\"],\n            recursive   = True\n            ):\n\n        \
+        \    _validate_datapoint(\n                datapoint_path = item.object_name,\n\
+        \                dataset_info = dataset_info\n                )\n\n      \
+        \          # minio_client.fget_object(\n                #     bucket_name\
+        \ = dataset_info[\"bucket_name\"],\n                #     object_name = item.object_name,\n\
+        \                #     file_path   = os.path.join(dataset.path,item.object_name)\n\
+        \                # )\n\n            # else:\n            #     continue\n\n\
+        \        return dataset_info\n\n    logging.info(\"Start validating dataset,\
+        \ each sample\")\n    dataset_info = validate_dataset(\n        _uri = dataset_minio_uri,\n\
+        \    )\n\n    os.listdir(f\"{dataset.metadata['local_path']}\")\n    dataset.name\
+        \ = \"AudioDataset\"\n    dataset.metadata = dataset_info\n\n"
       - --executor_input
       - '{{$}}'
       - --function_to_execute
-      - train
+      - validate_dataset_from_Minio
       command: [/kfp-launcher/launch, --mlmd_server_address, $(METADATA_GRPC_SERVICE_HOST),
         --mlmd_server_port, $(METADATA_GRPC_SERVICE_PORT), --runtime_info_json, $(KFP_V2_RUNTIME_INFO),
-        --container_image, $(KFP_V2_IMAGE), --task_name, train, --pipeline_name, '{{inputs.parameters.pipeline-name}}',
-        --run_id, $(KFP_RUN_ID), --run_resource, workflows.argoproj.io/$(WORKFLOW_ID),
-        --namespace, $(KFP_NAMESPACE), --pod_name, $(KFP_POD_NAME), --pod_uid, $(KFP_POD_UID),
-        --pipeline_root, '{{inputs.parameters.pipeline-root}}', --enable_caching,
-        $(ENABLE_CACHING), --, 'model_S3_bucket={{inputs.parameters.model_s3_bucket}}',
+        --container_image, $(KFP_V2_IMAGE), --task_name, validate-dataset-from-minio,
+        --pipeline_name, '{{inputs.parameters.pipeline-name}}', --run_id, $(KFP_RUN_ID),
+        --run_resource, workflows.argoproj.io/$(WORKFLOW_ID), --namespace, $(KFP_NAMESPACE),
+        --pod_name, $(KFP_POD_NAME), --pod_uid, $(KFP_POD_UID), --pipeline_root, '{{inputs.parameters.pipeline-root}}',
+        --enable_caching, $(ENABLE_CACHING), --, 'dataset_minio_uri={{inputs.parameters.dataset_uri}}',
         --]
       env:
       - name: KFP_POD_NAME
@@ -323,36 +157,30 @@ spec:
       - name: ENABLE_CACHING
         valueFrom:
           fieldRef: {fieldPath: 'metadata.labels[''pipelines.kubeflow.org/enable_caching'']'}
-      - {name: KFP_V2_IMAGE, value: 'capoolebugchat/kws-training:v0.8.0'}
-      - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {"model_S3_bucket":
-          {"type": "STRING"}}, "inputArtifacts": {"config": {"metadataPath": "/tmp/inputs/config/data",
-          "schemaTitle": "system.Artifact", "instanceSchema": "", "schemaVersion":
-          "0.0.1"}, "dataset": {"metadataPath": "/tmp/inputs/dataset/data", "schemaTitle":
-          "system.Dataset", "instanceSchema": "", "schemaVersion": "0.0.1"}}, "outputParameters":
-          {}, "outputArtifacts": {"model": {"schemaTitle": "system.Model", "instanceSchema":
-          "", "schemaVersion": "0.0.1", "metadataPath": "/tmp/outputs/model/data"}}}'}
+      - {name: KFP_V2_IMAGE, value: 'python:3.7'}
+      - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {"dataset_minio_uri":
+          {"type": "STRING"}}, "inputArtifacts": {}, "outputParameters": {}, "outputArtifacts":
+          {"dataset": {"schemaTitle": "system.Dataset", "instanceSchema": "", "schemaVersion":
+          "0.0.1", "metadataPath": "/tmp/outputs/dataset/data"}}}'}
       envFrom:
       - configMapRef: {name: metadata-grpc-configmap, optional: true}
-      image: capoolebugchat/kws-training:v0.8.0
+      image: python:3.7
       volumeMounts:
       - {mountPath: /kfp-launcher, name: kfp-launcher}
     inputs:
       parameters:
-      - {name: model_s3_bucket}
+      - {name: dataset_uri}
       - {name: pipeline-name}
       - {name: pipeline-root}
-      artifacts:
-      - {name: init-artifacts-train_config, path: /tmp/inputs/config/data}
-      - {name: init-artifacts-train_dataset, path: /tmp/inputs/dataset/data}
     outputs:
       artifacts:
-      - {name: train-model, path: /tmp/outputs/model/data}
+      - {name: validate-dataset-from-minio-dataset, path: /tmp/outputs/dataset/data}
     metadata:
       annotations:
         pipelines.kubeflow.org/v2_component: "true"
-        pipelines.kubeflow.org/component_ref: '{"digest": "8d8cb4a004b059640d4daa64930cbc52649ade2f099e743f2ce300662c71a3c8",
-          "url": "components/2_train/component_SDKv2.yaml"}'
-        pipelines.kubeflow.org/arguments.parameters: '{"model_S3_bucket": "{{inputs.parameters.model_s3_bucket}}"}'
+        pipelines.kubeflow.org/component_ref: '{"digest": "74438e8c818275d7aba4a314c72d5cea21f2522998f32908202b32a59d4f888e",
+          "url": "components/1_ingest_n_validate_data/component_SDKv2.yaml"}'
+        pipelines.kubeflow.org/arguments.parameters: '{"dataset_minio_uri": "{{inputs.parameters.dataset_uri}}"}'
       labels:
         pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
         pipelines.kubeflow.org/pipeline-sdk-type: kfp
@@ -367,9 +195,7 @@ spec:
     - {name: kfp-launcher}
   arguments:
     parameters:
-    - {name: config_file_url, value: h_param.yaml}
-    - {name: dataset_path, value: test_dataset}
-    - {name: model_s3_bucket, value: mlpipeline}
+    - {name: dataset_uri, value: test_dataset}
     - {name: pipeline-root, value: ''}
     - {name: pipeline-name, value: pipeline/KWS-CT-Pipeline}
   serviceAccountName: pipeline-runner

@@ -1,14 +1,14 @@
 from collections import namedtuple
-import glob
-import yaml
-import logging
 import kfp
 import kfp.v2.dsl as dsl
 from kfp.v2.dsl import (
     Input, Output, Artifact, Model, Dataset,component)
-from typing import NamedTuple, Optional
+import time
+import logging
+import os
+from typing import Optional
 
-
+print(os.system("pwd"))
 @component(
     output_component_file="components/0_init_artifacts/component_SDKv2.yaml"
 )

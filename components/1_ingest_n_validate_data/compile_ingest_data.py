@@ -6,22 +6,27 @@ import kfp.v2.dsl as dsl
 from kfp.v2.dsl import (
     Input, Output, Artifact, Model, Dataset,component)
 
-@component
-def ingest_data_to_local_dir(
-    dataset_uri: str,
-    dataset_path: str,
+@component(
+    packages_to_install=["minio"],
+    output_component_file="components/1_ingest_n_validate_data/component_SDKv2.yaml"
+)
+def validate_dataset_from_Minio(
+    dataset_minio_uri: str,
     dataset: Output[Dataset],
     # data_report: Output[Artifact] 
 ):
-#-> Output[Dataset]: Actual Dataset, downloaded to root dir and validated
-#-> Output[Artifact]: Data report: count, 
-# splits, tr-words count(all & in split), tr-words.
-
+    """ 
+    -> Output[Dataset]: Actual Dataset, downloaded to root dir and validated
+    -> Output[Artifact]: Data report: count, 
+    splits, tr-words count(all & in split), tr-words.
+    """
+    
     import logging
     import os
 
     MINIO_SERVICE_HOST="minio-service.kubeflow.svc.cluster.local"
     MINIO_SERVICE_PORT="9000"
+    
     #TODO: change these to using Kubeflow's Minio Secrets
     MINIO_SERVICE_ACCESS_KEY="minio"
     MINIO_SERVICE_SECRET_KEY="minio123"
@@ -34,7 +39,40 @@ def ingest_data_to_local_dir(
         secret_key = MINIO_SERVICE_SECRET_KEY,
         secure     = MINIO_SERVICE_SECURITY_OPTION
     )
+
+    os.mkdir("/dataset")
+    dataset.metadata["origin"] = dataset_minio_uri
+    dataset.metadata["local_path"] = "/dataset"    
+    logging.info(os.listdir())
     
+    def _create_rclone_config() -> None:
+        
+        with open("rclone.conf", 'w') as conf_file:
+
+            conf_file.write("[kf_minio]\n")
+            conf_file.write("type=s3\n")
+            conf_file.write("provider = minio\n")
+            conf_file.write(f"env_auth = {MINIO_SERVICE_SECURITY_OPTION}\n")
+            conf_file.write(f"access_key_id = {MINIO_SERVICE_ACCESS_KEY}\n")
+            conf_file.write(f"secret_access_key = {MINIO_SERVICE_SECRET_KEY}\n")
+            conf_file.write(f"endpoint = https://{MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}/")
+            
+        logging.info("configuration file written")
+
+    def _mount():
+        
+        import os
+        _create_rclone_config()
+        os.system( \
+            f"rclone mount kf_minio://test-training-data/test-train-dataset {dataset.metadata['local_path']} \
+            --config rclone.conf \
+            --allow-other \
+            --log-file rclone.log \
+            --vfs-cache-mode full \
+            -vv \
+            --daemon"
+        )
+
     def _parse_uri(uri:str):        
         dataset_info = {}
         
@@ -71,9 +109,9 @@ def ingest_data_to_local_dir(
             return False
         return True
 
-    def download_entire_dataset(
+    def validate_dataset(
         _uri:str,
-        local_storage_dir:str
+        # local_storage_dir:str
         ):
     #-> download dataset to pipeline root, all while count dataset, source: minio
 
@@ -95,36 +133,35 @@ def ingest_data_to_local_dir(
             recursive   = True
             ):
 
-            if _validate_datapoint(
+            _validate_datapoint(
                 datapoint_path = item.object_name,
                 dataset_info = dataset_info
-                ):
-                
-                minio_client.fget_object(
-                    bucket_name = dataset_info["bucket_name"],
-                    object_name = item.object_name,
-                    file_path   = os.path.join(dataset.path,item.object_name)
                 )
+                
+                # minio_client.fget_object(
+                #     bucket_name = dataset_info["bucket_name"],
+                #     object_name = item.object_name,
+                #     file_path   = os.path.join(dataset.path,item.object_name)
+                # )
 
-            else:
-                continue
+            # else:
+            #     continue
         
         return dataset_info
     
-    logging.info("Start downloading and validating dataset, each sample")
-    dataset_info = download_entire_dataset(
-        _uri = dataset_uri,
-        local_storage_dir = dataset_path,
+    logging.info("Mounting dataset key")
+    _mount()
+    logging.info("Start validating dataset, each sample")
+    dataset_info = validate_dataset(
+        _uri = dataset_minio_uri,
     )
     
+    os.listdir(f"{dataset.metadata['local_path']}")
     dataset.name = "AudioDataset"
     dataset.metadata = dataset_info
-    dataset.metadata["origin"] = dataset_uri
-    dataset.metadata["local_path"] = dataset_path
 
-
-from kfp.compiler import Compiler
-Compiler().compile(
-    pipeline_func=ingest_data_to_local_dir,
-    package_path="components/1_ingest_n_validate_data/component_SDKv2b4.yaml"
-)
+# from kfp.compiler import Compiler
+# Compiler().compile(
+#     pipeline_func=validate_dataset_from_Minio,
+#     package_path="components/1_ingest_n_validate_data/component_SDKv2b4.yaml"
+# )

@@ -1,0 +1,104 @@
+name: Validate dataset from Minio
+description: '-> Output[Dataset]: Actual Dataset, downloaded to root dir and validated'
+inputs:
+- {name: dataset_minio_uri, type: String}
+outputs:
+- {name: dataset, type: Dataset}
+implementation:
+  container:
+    image: python:3.7
+    command:
+    - sh
+    - -c
+    - |2
+
+      if ! [ -x "$(command -v pip)" ]; then
+          python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
+      fi
+
+      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'minio' 'kfp==1.8.13' && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp -d)
+      printf "%s" "$0" > "$program_path/ephemeral_component.py"
+      python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+    - "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing\
+      \ import *\n\ndef validate_dataset_from_Minio(\n    dataset_minio_uri: str,\n\
+      \    dataset: Output[Dataset],\n    # data_report: Output[Artifact] \n):\n \
+      \   \"\"\" \n    -> Output[Dataset]: Actual Dataset, downloaded to root dir\
+      \ and validated\n    -> Output[Artifact]: Data report: count, \n    splits,\
+      \ tr-words count(all & in split), tr-words.\n    \"\"\"\n\n    import logging\n\
+      \    import os\n\n    MINIO_SERVICE_HOST=\"minio-service.kubeflow.svc.cluster.local\"\
+      \n    MINIO_SERVICE_PORT=\"9000\"\n\n    #TODO: change these to using Kubeflow's\
+      \ Minio Secrets\n    MINIO_SERVICE_ACCESS_KEY=\"minio\"\n    MINIO_SERVICE_SECRET_KEY=\"\
+      minio123\"\n    MINIO_SERVICE_SECURITY_OPTION=False\n\n    from minio import\
+      \ Minio\n    minio_client = Minio(\n        f\"{MINIO_SERVICE_HOST+':'+MINIO_SERVICE_PORT}\"\
+      ,\n        access_key = MINIO_SERVICE_ACCESS_KEY,\n        secret_key = MINIO_SERVICE_SECRET_KEY,\n\
+      \        secure     = MINIO_SERVICE_SECURITY_OPTION\n    )\n\n    os.mkdir(\"\
+      /dataset\")\n    dataset.metadata[\"origin\"] = dataset_minio_uri\n    dataset.metadata[\"\
+      local_path\"] = \"/dataset\"    \n\n    def _create_rclone_config():\n\n   \
+      \     with open(\"rclone.conf\", 'w') as conf_file:\n\n            conf_file.write(\"\
+      [kf_minio]\\n\")\n            conf_file.write(\"type=s3\\n\")\n            conf_file.write(\"\
+      provider = minio\\n\")\n            conf_file.write(f\"env_auth = {MINIO_SERVICE_SECURITY_OPTION}\\\
+      n\")\n            conf_file.write(f\"access_key_id = {MINIO_SERVICE_ACCESS_KEY}\\\
+      n\")\n            conf_file.write(f\"secret_access_key = {MINIO_SERVICE_SECRET_KEY}\\\
+      n\")\n            conf_file.write(f\"endpoint = https://{MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}/\"\
+      )\n\n        logging.info(\"configuration file written\")\n\n    def _mount():\n\
+      \n        import os\n        _create_rclone_config()\n        os.system( \\\n\
+      \            f\"rclone mount kf_minio://test-training-data/test-train-dataset\
+      \ {dataset.metadata['local_path']} \\\n            --config rclone.conf \\\n\
+      \            --allow-other \\\n            --log-file rclone.log \\\n      \
+      \      --vfs-cache-mode full \\\n            -vv \\\n            --daemon\"\n\
+      \        )\n\n\n    def _parse_uri(uri:str):        \n        dataset_info =\
+      \ {}\n\n        if uri.split(\":\")[0]==\"minio\":\n            uri_segments\
+      \ = uri[:8].split('/')\n            dataset_info[\"bucket_name\"] = uri_segments[0]\n\
+      \            dataset_info[\"directory\"] = os.path.join(*uri_segments[1:])\n\
+      \        else: \n            logging.info(\"wrong URI format, should be minio://bucket/folder/...\"\
+      )\n        return dataset_info\n\n    def _validate_datapoint(\n        datapoint_path:Any,\n\
+      \        dataset_info: dict\n    ):\n    #TODO: this is not optimal, consider\
+      \ numpy-like parrallelism\n        datapoint_path = str(datapoint_path)\n  \
+      \      if \"/training/\" in datapoint_path: \n            dataset_info[\"train_split\"\
+      ][\"count\"][\"total\"]+=1\n            if \"/trigger/\" in datapoint_path:\
+      \ dataset_info[\"train_split\"][\"count\"][\"trigger\"]+=1\n            elif\
+      \ \"/non-trigger/\" in datapoint_path: dataset_info[\"train_split\"][\"count\"\
+      ][\"non-trigger\"]+=1\n        elif \"/testing/\" in datapoint_path: \n    \
+      \        dataset_info[\"test_split\"][\"count\"][\"total\"]+=1\n           \
+      \ if \"/trigger/\" in datapoint_path: dataset_info[\"test_split\"][\"count\"\
+      ][\"trigger\"]+=1\n            elif \"/non-trigger/\" in datapoint_path: dataset_info[\"\
+      test_split\"][\"count\"][\"non-trigger\"]+=1\n        elif \"/validation/\"\
+      \ in datapoint_path: \n            dataset_info[\"val_split\"][\"count\"][\"\
+      total\"]+=1\n            if \"/trigger/\" in datapoint_path: dataset_info[\"\
+      val_split\"][\"count\"][\"trigger\"]+=1\n            elif \"/non-trigger/\"\
+      \ in datapoint_path: dataset_info[\"val_split\"][\"count\"][\"non-trigger\"\
+      ]+=1\n        elif \"_background_noise_\" in datapoint_path:\n            dataset_info[\"\
+      count\"]+=1\n        else : \n            logging.info(f\"Not a valid datapoint,\
+      \ path: {datapoint_path}\")\n            return False\n        return True\n\
+      \n    def validate_dataset(\n        _uri:str,\n        # local_storage_dir:str\n\
+      \        ):\n    #-> download dataset to pipeline root, all while count dataset,\
+      \ source: minio\n\n        dataset_info = _parse_uri(_uri)\n        dataset_info[\"\
+      train_split\"] = {}\n        dataset_info[\"test_split\"] = {}\n        dataset_info[\"\
+      val_split\"] = {}\n        dataset_info[\"count\"] = 0\n        dataset_info[\"\
+      train_split\"][\"count\"] = {\"total\":0, \n                               \
+      \                 \"trigger\":0, \"non-trigger\":0}\n        dataset_info[\"\
+      test_split\"][\"count\"] = {\"total\":0, \n                                \
+      \                \"trigger\":0, \"non-trigger\":0}\n        dataset_info[\"\
+      val_split\"][\"count\"] = {\"total\":0, \n                                 \
+      \               \"trigger\":0, \"non-trigger\":0}\n\n        for item in minio_client.list_objects(\n\
+      \            bucket_name = dataset_info[\"bucket_name\"],\n            prefix\
+      \      = dataset_info[\"directory\"],\n            recursive   = True\n    \
+      \        ):\n\n            _validate_datapoint(\n                datapoint_path\
+      \ = item.object_name,\n                dataset_info = dataset_info\n       \
+      \         )\n\n                # minio_client.fget_object(\n               \
+      \ #     bucket_name = dataset_info[\"bucket_name\"],\n                #    \
+      \ object_name = item.object_name,\n                #     file_path   = os.path.join(dataset.path,item.object_name)\n\
+      \                # )\n\n            # else:\n            #     continue\n\n\
+      \        return dataset_info\n\n    logging.info(\"Start validating dataset,\
+      \ each sample\")\n    dataset_info = validate_dataset(\n        _uri = dataset_minio_uri,\n\
+      \    )\n\n    os.listdir(f\"{dataset.metadata['local_path']}\")\n    dataset.name\
+      \ = \"AudioDataset\"\n    dataset.metadata = dataset_info\n\n"
+    args:
+    - --executor_input
+    - {executorInput: null}
+    - --function_to_execute
+    - validate_dataset_from_Minio

@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: ingest-data-to-local-dir-2-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.13, pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-09T11:12:15.429399',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.13, pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-09T14:03:56.460896',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Ingest data to local dir",
       "inputs": [{"name": "dataset_uri", "type": "String"}, {"name": "dataset_path",
       "type": "String"}], "name": "Ingest data to local dir"}'}
