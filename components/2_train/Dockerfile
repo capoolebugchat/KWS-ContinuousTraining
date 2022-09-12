@@ -1,25 +1,22 @@
-FROM capoolebugchat/kws-training:v0.7.0
-# RUN mkdir /workspace
+FROM tensorflow/tensorflow:2.7.0
+RUN mkdir /workspace
 WORKDIR /workspace
 
-
 RUN apt-get update
+RUN apt update
 RUN apt-get install unzip
 COPY . .
 RUN ls .
 RUN pip install -r requirements.txt --no-cache-dir
-# RUN pip install -U numpy
-# RUN pip install -U minio
-# RUN curl https://rclone.org/install.sh | bash
-RUN ls
-# RUN rclone --config rclone.conf \
-#     mount kf_minio://test-training-data/test_data train_dataset \
-#     --allow-other \
-#     --log-file rclone.log \
-#     --vfs-cache-mode full \
-#     -vv \
-#     --daemon
-# run rclone remote
-ENTRYPOINT ["bin/bash"]
-# RUN mkdir /workspace/keyword-spotting-train
-# WORKDIR /workspace/keyword-spotting-train
+RUN pip install -U numpy
+RUN apt install -y kmod
+RUN apt install -y fuse
+RUN apt install -y libfuse2
+# RUN modprobe fuse
+RUN python3 -m pip install -U minio
+RUN curl https://rclone.org/install.sh | bash
+RUN apt install nano
+RUN python3 -m pip install kfp==1.8.13
+
+# RUN ls
+# ENTRYPOINT ["python3 train.py --dataset-uri"]

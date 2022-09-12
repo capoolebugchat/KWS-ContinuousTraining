@@ -1,25 +1,22 @@
+# deprecated mounting S3 bucket into the container, using pvc mount.
+# Download data offline (to kfp-launcher), use them for all the things
+
 from collections import namedtuple
-import argparse
 from minio import Minio
-import glob
-import yaml
-import logging
 import kfp
 import kfp.v2.dsl as dsl
 from kfp.v2.dsl import (
     Input, Output, Artifact, Model, Dataset,component)
-from typing import NamedTuple
 
-@component(
-    base_image="capoolebugchat/kws-training:v0.8.0",
-    # packages_to_install=["minio"],
-    output_component_file="components/2_train/component_SDKv2.yaml"
-)
+# @component(
+#     base_image="capoolebugchat/kws-training:v0.12.0",
+#     output_component_file="components/2_train/component_SDKv2.yaml"
+# )
 def train(
     model_S3_bucket: str,
-    dataset: Input[Dataset],
-    config: Input[Artifact],
-    model: Output[Model]
+    dataset_uri: str, # kf_minio://bucket/folder
+    # config: Input[Artifact],
+    # model: Output[Model]
 ) -> None:
 
     import logging
@@ -27,8 +24,8 @@ def train(
     import yaml
     import os
 
-    logging.info("model path:"+model.path)
-    logging.info("model URI:"+model.uri)
+    # logging.info("model path:"+model.path)
+    # logging.info("model URI:"+model.uri)
     
     MINIO_SERVICE_HOST="minio-service.kubeflow.svc.cluster.local"
     MINIO_SERVICE_PORT="9000"
@@ -48,14 +45,22 @@ def train(
     logging.info(f"Connected to Minio Server at {MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}")
     
     logging.info(f"{os.listdir}")
+    
+    train_data_dir = "train_dataset2"
+    os.system(f"mkdir {train_data_dir}")
+    os.system(f"modprobe fuse")
     os.system( \
-        f"rclone mount kf_minio://test-training-data/test-train-dataset {dataset.metadata['local_path']} \
-        --config ./rclone.conf \
+        f"rclone mount {dataset_uri} {train_data_dir} \
+        --config rclone.conf \
         --allow-other \
         --log-file rclone.log \
         --vfs-cache-mode full \
-        -vv ")
-#        --daemon"    
+        -vv \
+        --daemon")
+    
+    with open("rclone.log", 'r') as log_file:
+        for line in log_file.readlines():
+            print(line)
 
     logging.info("Mounted rclone training data folder")
     
@@ -75,15 +80,6 @@ def train(
                 env_f.write(f"{key} = '{hyperparams[key]}'\n")
             else: env_f.write(f"{key} = {hyperparams[key]}\n")
 
-    def _mount() -> None:
-        
-        import os
-        # _create_rclone_config()
-        dir = dataset.metadata["local_path"]
-        os.system(f"mkdir {dir}")
-        os.system(f"rclone mount kf_minio:/pipeline {dir} \
-            --daemon --log-file rclone.log \
-            --config rclone.conf -vv")
 
     def _train():
         logging.info("Traning commencing.")
@@ -104,16 +100,16 @@ def train(
                     os.sep, "/")  # Replace \ with / on Windows
                 minio_client.fput_object(bucket_name, remote_path, local_file)
         
-    model.metadata = {
-        "version":"v0.1.1",
-        "S3_URI":f"S3://{model_S3_bucket}/saved_model"
-        }
+    # model.metadata = {
+    #     "version":"v0.1.1",
+    #     "S3_URI":f"S3://{model_S3_bucket}/saved_model"
+    #     }
 
     logging.info("Loading hyperparams:")
     _yaml_to_env(
-        yaml_file = config.metadata["local_path"],
+        yaml_file = "h_param.yaml",
         env_file = "hparam.env",
-        data_path = dataset.metadata["local_path"])
+        data_path = "train_dataset")
     
     logging.info("Training model")
     _train()
@@ -126,6 +122,17 @@ def train(
     
     logging.info("Model uploaded to minio bucket.")
     logging.info(f"Training finished, check storage at minio://{model_S3_bucket}/saved_model/1")
+
+import argparse
+
+# Defining and parsing the command-line arguments
+parser = argparse.ArgumentParser(description='None')
+# Paths must be passed in, not hardcoded
+parser.add_argument('--dataset-uri', type=str,
+  help='Minio URI of training dataset.')
+args = parser.parse_args()
+
+train(args.dataset_uri)
 
 # V2 compilation
 # from kfp.compiler import Compiler

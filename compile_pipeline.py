@@ -16,7 +16,7 @@ deploy_op = load_component_from_file("components/4_deploy/component_SDKv2.yaml")
 def pipeline(
     # config_file_url: str = "h_param.yaml",
     dataset_uri: str = "test_dataset",
-    # model_s3_bucket: str = "mlpipeline",
+    model_s3_bucket: str = "mlpipeline",
 ):
     # init_task = init_op(
     #     config_path = config_file_url,
@@ -24,10 +24,15 @@ def pipeline(
     #     version = "v0.0.1")
     # train_task = train_op(
     #     model_s3_bucket = model_s3_bucket,
-    #     config = init_task.outputs["train_config"],
-    #     dataset = init_task.outputs["train_dataset"]
+    #     dataset_uri = dataset_uri,
     # )
-    ingest_data_task = ingest_data_op(dataset_uri)
+    train_task = kfp.dsl.ContainerOp(
+        name = "training",
+        image= "capoolebugchat/kws-training:v0.12.0",
+        arguments= ["--device", "/dev/fuse", "--cap-add" "SYS_ADMIN"],
+        command= "python3 -m kws"
+    )
+    # ingest_data_task = ingest_data_op(dataset_uri)
     # deploy_task = deploy_op(
     #     model = train_task.outputs["model"]
     # )

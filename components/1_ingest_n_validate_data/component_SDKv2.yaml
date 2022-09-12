@@ -37,25 +37,25 @@ implementation:
       ,\n        access_key = MINIO_SERVICE_ACCESS_KEY,\n        secret_key = MINIO_SERVICE_SECRET_KEY,\n\
       \        secure     = MINIO_SERVICE_SECURITY_OPTION\n    )\n\n    os.mkdir(\"\
       /dataset\")\n    dataset.metadata[\"origin\"] = dataset_minio_uri\n    dataset.metadata[\"\
-      local_path\"] = \"/dataset\"    \n\n    def _create_rclone_config():\n\n   \
-      \     with open(\"rclone.conf\", 'w') as conf_file:\n\n            conf_file.write(\"\
-      [kf_minio]\\n\")\n            conf_file.write(\"type=s3\\n\")\n            conf_file.write(\"\
-      provider = minio\\n\")\n            conf_file.write(f\"env_auth = {MINIO_SERVICE_SECURITY_OPTION}\\\
+      local_path\"] = \"/dataset\"    \n    logging.info(os.listdir())\n\n    def\
+      \ _create_rclone_config() -> None:\n\n        with open(\"rclone.conf\", 'w')\
+      \ as conf_file:\n\n            conf_file.write(\"[kf_minio]\\n\")\n        \
+      \    conf_file.write(\"type=s3\\n\")\n            conf_file.write(\"provider\
+      \ = minio\\n\")\n            conf_file.write(f\"env_auth = {MINIO_SERVICE_SECURITY_OPTION}\\\
       n\")\n            conf_file.write(f\"access_key_id = {MINIO_SERVICE_ACCESS_KEY}\\\
       n\")\n            conf_file.write(f\"secret_access_key = {MINIO_SERVICE_SECRET_KEY}\\\
       n\")\n            conf_file.write(f\"endpoint = https://{MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}/\"\
-      )\n\n        logging.info(\"configuration file written\")\n\n    def _mount():\n\
-      \n        import os\n        _create_rclone_config()\n        os.system( \\\n\
-      \            f\"rclone mount kf_minio://test-training-data/test-train-dataset\
-      \ {dataset.metadata['local_path']} \\\n            --config rclone.conf \\\n\
-      \            --allow-other \\\n            --log-file rclone.log \\\n      \
-      \      --vfs-cache-mode full \\\n            -vv \\\n            --daemon\"\n\
-      \        )\n\n\n    def _parse_uri(uri:str):        \n        dataset_info =\
-      \ {}\n\n        if uri.split(\":\")[0]==\"minio\":\n            uri_segments\
-      \ = uri[:8].split('/')\n            dataset_info[\"bucket_name\"] = uri_segments[0]\n\
-      \            dataset_info[\"directory\"] = os.path.join(*uri_segments[1:])\n\
-      \        else: \n            logging.info(\"wrong URI format, should be minio://bucket/folder/...\"\
-      )\n        return dataset_info\n\n    def _validate_datapoint(\n        datapoint_path:Any,\n\
+      )\n\n        logging.info(\"configuration file written\")\n\n    def _mount()\
+      \ -> None:\n\n        import os\n        _create_rclone_config()\n        dir\
+      \ = dataset.metadata[\"local_path\"]\n        os.system(f\"mkdir {dir}\")\n\
+      \        os.system(f\"rclone mount kf_minio:mlpipeline/pipeline {dir} \\\n \
+      \           --daemon --log-file rclone.log \\\n            --config rclone.conf\
+      \ -vv\")\n\n    def _parse_uri(uri:str):        \n        dataset_info = {}\n\
+      \n        if uri.split(\":\")[0]==\"minio\":\n            uri_segments = uri[:8].split('/')\n\
+      \            dataset_info[\"bucket_name\"] = uri_segments[0]\n            dataset_info[\"\
+      directory\"] = os.path.join(*uri_segments[1:])\n        else: \n           \
+      \ logging.info(\"wrong URI format, should be minio://bucket/folder/...\")\n\
+      \        return dataset_info\n\n    def _validate_datapoint(\n        datapoint_path:Any,\n\
       \        dataset_info: dict\n    ):\n    #TODO: this is not optimal, consider\
       \ numpy-like parrallelism\n        datapoint_path = str(datapoint_path)\n  \
       \      if \"/training/\" in datapoint_path: \n            dataset_info[\"train_split\"\
@@ -93,9 +93,10 @@ implementation:
       \ #     bucket_name = dataset_info[\"bucket_name\"],\n                #    \
       \ object_name = item.object_name,\n                #     file_path   = os.path.join(dataset.path,item.object_name)\n\
       \                # )\n\n            # else:\n            #     continue\n\n\
-      \        return dataset_info\n\n    logging.info(\"Start validating dataset,\
-      \ each sample\")\n    dataset_info = validate_dataset(\n        _uri = dataset_minio_uri,\n\
-      \    )\n\n    os.listdir(f\"{dataset.metadata['local_path']}\")\n    dataset.name\
+      \        return dataset_info\n\n    logging.info(\"Mounting dataset key\")\n\
+      \    _mount()\n    logging.info(\"Start validating dataset, each sample\")\n\
+      \    dataset_info = validate_dataset(\n        _uri = dataset_minio_uri,\n \
+      \   )\n\n    os.listdir(f\"{dataset.metadata['local_path']}\")\n    dataset.name\
       \ = \"AudioDataset\"\n    dataset.metadata = dataset_info\n\n"
     args:
     - --executor_input
