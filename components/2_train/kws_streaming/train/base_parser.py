@@ -15,41 +15,8 @@
 
 """Base parser with training/testing data speech features flags ."""
 
-import os
 import argparse
 from absl import logging
-from dotenv import load_dotenv
-load_dotenv('hparams.env')
-
-WANTED_WORDS = os.getenv('wanted_words')
-DATA_DIR = os.getenv('data_path')
-TRAIN_DIR = os.getenv('train_res')
-SPLIT_DATA = os.getenv('split_data')
-
-CLIP_DURATION = os.getenv('clip_duration')
-print(CLIP_DURATION)
-BACKGROUND_VOLUME = os.getenv('background_volume')
-print(BACKGROUND_VOLUME)
-BACKGROUND_FREQUENCY = os.getenv('background_frequency')
-
-TRAINING_STEPS = os.getenv('training_steps')
-LEARNING_RATE = os.getenv('learning_rate')
-LR_SCHEDULE = os.getenv('lr_schedule')
-BATCH_SIZE = os.getenv('batch_size')
-EVAL_STEP_INTERVAL = os.getenv('eval_step_interval')
-
-MEL_UPPER_EDGE_HERTZ = os.getenv('mel_upper_edge_hertz')
-MEL_LOWER_EDGE_HERTZ = os.getenv('mel_lower_edge_hertz')
-WINDOW_SIZE_MS = os.getenv('window_stride_ms')
-MEL_NUM_BINS = os.getenv('mel_num_bins')
-DCT_NUM_FEATURES= os.getenv('dct_num_features')
-
-USE_SPEC_AUGMENT = os.getenv('use_spec_augment')
-TIME_MASKS_NUMBER = os.getenv('time_masks_number')
-TIME_MASK_MAX_SIZE = os.getenv('time_mask_max_size')
-FREQUENCY_MASKS_NUMBER= os.getenv('frequency_masks_number')
-FREQUENCY_MASK_MAX_SIZE = os.getenv('frequency_mask_max_size')
-PICK_DETERMINISTICALLY = os.getenv('pick_deterministically')
 
 
 def base_parser():
@@ -73,7 +40,7 @@ def base_parser():
   parser.add_argument(
       '--data_dir',
       type=str,
-      default=str(DATA_DIR),
+      default='/tmp/speech_dataset/',
       help="""\
       Where to download the speech training data to.
       """)
@@ -92,7 +59,7 @@ def base_parser():
   parser.add_argument(
       '--background_volume',
       type=float,
-      default=float(BACKGROUND_VOLUME),
+      default=0.1,
       help="""\
       How loud the background noise should be, between 0 and 1.
       """)
@@ -106,14 +73,14 @@ def base_parser():
   parser.add_argument(
       '--background_frequency',
       type=float,
-      default=float(BACKGROUND_FREQUENCY),
+      default=0.8,
       help="""\
       How many of the training samples have background noise mixed in.
       """)
   parser.add_argument(
       '--split_data',
       type=int,
-      default=int(SPLIT_DATA),
+      default=1,
       help="""\
       If 1, it will split data located in data_dir \
       into training/testing/validation data sets. \
@@ -170,35 +137,35 @@ def base_parser():
   parser.add_argument(
       '--how_many_training_steps',
       type=str,
-      default=str(TRAINING_STEPS),
+      default='10000,10000,10000',
       help='How many training loops to run',
   )
   parser.add_argument(
       '--eval_step_interval',
       type=int,
-      default=int(EVAL_STEP_INTERVAL),
+      default=400,
       help='How often to evaluate the training results.')
   parser.add_argument(
       '--learning_rate',
       type=str,
-      default=str(LEARNING_RATE),
+      default='0.0005,0.0001,0.00002',
       help='How large a learning rate to use when training.')
   parser.add_argument(
       '--batch_size',
       type=int,
-      default=int(BATCH_SIZE),
+      default=100,
       help='How many items to train with at once',
   )
   parser.add_argument(
       '--wanted_words',
       type=str,
-      default=str(WANTED_WORDS),
+      default='yes,no,up,down,left,right,on,off,stop,go',
       help='Words to use (others will be added to an unknown label)',
   )
   parser.add_argument(
       '--train_dir',
       type=str,
-      default=str(TRAIN_DIR),
+      default='/tmp/speech_commands_train',
       help='Directory to write event logs and checkpoint.')
   parser.add_argument(
       '--save_step_interval',
@@ -293,13 +260,13 @@ def base_parser():
   parser.add_argument(
       '--window_size_ms',
       type=float,
-      default=float(WINDOW_SIZE_MS),
+      default=40.0,
       help='How long each spectrogram timeslice is.',
   )
   parser.add_argument(
       '--window_stride_ms',
       type=float,
-      default=float(WINDOW_SIZE_MS),
+      default=20.0,
       help='How far to move in time between spectrogram timeslices.',
   )
   parser.add_argument(
@@ -339,14 +306,14 @@ def base_parser():
   parser.add_argument(
       '--mel_lower_edge_hertz',
       type=float,
-      default=float(MEL_LOWER_EDGE_HERTZ),
+      default=20.0,
       help='Lower bound on the frequencies to be included in the mel spectrum.'
       'This corresponds to the lower edge of the lowest triangular band.',
   )
   parser.add_argument(
       '--mel_upper_edge_hertz',
       type=float,
-      default=float(MEL_UPPER_EDGE_HERTZ),
+      default=7000.0,
       help='The desired top edge of the highest frequency band',
   )
   parser.add_argument(
@@ -358,7 +325,7 @@ def base_parser():
   parser.add_argument(
       '--dct_num_features',
       type=int,
-      default=int(DCT_NUM_FEATURES),
+      default=20,
       help='Number of features left after DCT',
   )
   parser.add_argument(
@@ -385,37 +352,37 @@ def base_parser():
   parser.add_argument(
       '--mel_num_bins',
       type=int,
-      default=int(MEL_NUM_BINS),
+      default=40,
       help='How many bands in the resulting mel spectrum.',
   )
   parser.add_argument(
       '--use_spec_augment',
       type=int,
-      default=int(USE_SPEC_AUGMENT),
+      default=0,
       help='use SpecAugment',
   )
   parser.add_argument(
       '--time_masks_number',
       type=int,
-      default=int(TIME_MASKS_NUMBER),
+      default=2,
       help='SpecAugment parameter time_masks_number',
   )
   parser.add_argument(
       '--time_mask_max_size',
       type=int,
-      default=int(TIME_MASK_MAX_SIZE),
+      default=10,
       help='SpecAugment parameter time_mask_max_size.',
   )
   parser.add_argument(
       '--frequency_masks_number',
       type=int,
-      default=int(FREQUENCY_MASKS_NUMBER),
+      default=2,
       help='SpecAugment parameter frequency_masks_number.',
   )
   parser.add_argument(
       '--frequency_mask_max_size',
       type=int,
-      default=int(FREQUENCY_MASK_MAX_SIZE),
+      default=5,
       help='SpecAugment parameter frequency_mask_max_size.',
   )
   parser.add_argument(
@@ -445,7 +412,7 @@ def base_parser():
   parser.add_argument(
       '--return_softmax',
       type=int,
-      default=1,
+      default=0,
       help='Use softmax in the model: '
       ' 0 for SparseCategoricalCrossentropy '
       ' 1 for CategoricalCrossentropy '
@@ -478,7 +445,7 @@ def base_parser():
   parser.add_argument(
       '--pick_deterministically',
       type=int,
-      default=int(PICK_DETERMINISTICALLY),
+      default=0,
       help='Pick training data in every epoch deterministically',
   )
   parser.add_argument(

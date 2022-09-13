@@ -14,9 +14,7 @@ RUN apt install -y fuse
 RUN apt install -y libfuse2
 # RUN modprobe fuse
 RUN python3 -m pip install -U minio
-RUN curl https://rclone.org/install.sh | bash
 RUN apt install nano
-RUN python3 -m pip install kfp==1.8.13
 
 # RUN ls
 # ENTRYPOINT ["python3 train.py --dataset-uri"]

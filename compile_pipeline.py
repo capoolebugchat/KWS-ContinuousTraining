@@ -3,6 +3,7 @@ from kfp.components import load_component_from_file
 import kfp.v2.dsl as dsl
 from kfp.v2.dsl import Model, Dataset, Artifact
 from kfp.compiler import Compiler
+from kfp.onprem import mount_pvc
 
 init_op = load_component_from_file("components/0_init_artifacts/component_SDKv2.yaml")
 ingest_data_op = load_component_from_file("components/1_ingest_n_validate_data/component_SDKv2.yaml")
@@ -22,16 +23,15 @@ def pipeline(
     #     config_path = config_file_url,
     #     dataset_path = dataset_path,
     #     version = "v0.0.1")
-    # train_task = train_op(
-    #     model_s3_bucket = model_s3_bucket,
-    #     dataset_uri = dataset_uri,
-    # )
-    train_task = kfp.dsl.ContainerOp(
-        name = "training",
-        image= "capoolebugchat/kws-training:v0.12.0",
-        arguments= ["--device", "/dev/fuse", "--cap-add" "SYS_ADMIN"],
-        command= "python3 -m kws"
+    train_task = train_op(
+        model_s3_bucket = model_s3_bucket,
+        dataset_location = "/workspace/train_dataset/test-train-dataset"
     )
+    train_task.apply(mount_pvc(
+        pvc_name="example-dataset",
+        volume_name="dataset",
+        volume_mount_path="/workspace/train_dataset"
+    ))
     # ingest_data_task = ingest_data_op(dataset_uri)
     # deploy_task = deploy_op(
     #     model = train_task.outputs["model"]

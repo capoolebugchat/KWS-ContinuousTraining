@@ -1,0 +1,137 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: test-pipeline-
+  annotations:
+    pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+    pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-13T10:06:20.370012'
+    pipelines.kubeflow.org/pipeline_spec: '{"inputs": [{"default": "", "name": "pipeline-root"},
+      {"default": "pipeline/test pipeline", "name": "pipeline-name"}], "name": "test
+      pipeline"}'
+    pipelines.kubeflow.org/v2_pipeline: "true"
+  labels:
+    pipelines.kubeflow.org/v2_pipeline: "true"
+    pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+spec:
+  entrypoint: test-pipeline
+  templates:
+  - name: generate-my-artifacts
+    container:
+      args:
+      - sh
+      - -c
+      - |2
+
+        if ! [ -x "$(command -v pip)" ]; then
+            python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
+        fi
+
+        PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'kfp==1.8.13' && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp -d)
+        printf "%s" "$0" > "$program_path/ephemeral_component.py"
+        python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+      - |2+
+
+        import kfp
+        from kfp.v2 import dsl
+        from kfp.v2.dsl import *
+        from typing import *
+
+        def generate_my_Artifacts(
+            outp: Output[Artifact]
+        ):
+            import logging
+            import os
+            os.system("ls //")
+            os.system("ls /mnt/pipeline")
+            os.system("ls /mnt/pipeline/test-train-dataset")
+            logging.info("Path:"+outp.path)
+            logging.info("URI:"+outp.path)
+
+      - --executor_input
+      - '{{$}}'
+      - --function_to_execute
+      - generate_my_Artifacts
+      command: [/kfp-launcher/launch, --mlmd_server_address, $(METADATA_GRPC_SERVICE_HOST),
+        --mlmd_server_port, $(METADATA_GRPC_SERVICE_PORT), --runtime_info_json, $(KFP_V2_RUNTIME_INFO),
+        --container_image, $(KFP_V2_IMAGE), --task_name, generate-my-artifacts, --pipeline_name,
+        '{{inputs.parameters.pipeline-name}}', --run_id, $(KFP_RUN_ID), --run_resource,
+        workflows.argoproj.io/$(WORKFLOW_ID), --namespace, $(KFP_NAMESPACE), --pod_name,
+        $(KFP_POD_NAME), --pod_uid, $(KFP_POD_UID), --pipeline_root, '{{inputs.parameters.pipeline-root}}',
+        --enable_caching, $(ENABLE_CACHING), --, --]
+      env:
+      - name: KFP_POD_NAME
+        valueFrom:
+          fieldRef: {fieldPath: metadata.name}
+      - name: KFP_POD_UID
+        valueFrom:
+          fieldRef: {fieldPath: metadata.uid}
+      - name: KFP_NAMESPACE
+        valueFrom:
+          fieldRef: {fieldPath: metadata.namespace}
+      - name: WORKFLOW_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''workflows.argoproj.io/workflow'']'}
+      - name: KFP_RUN_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipeline/runid'']'}
+      - name: ENABLE_CACHING
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipelines.kubeflow.org/enable_caching'']'}
+      - {name: KFP_V2_IMAGE, value: 'python:3.7'}
+      - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {}, "inputArtifacts":
+          {}, "outputParameters": {}, "outputArtifacts": {"outp": {"schemaTitle":
+          "system.Artifact", "instanceSchema": "", "schemaVersion": "0.0.1", "metadataPath":
+          "/tmp/outputs/outp/data"}}}'}
+      envFrom:
+      - configMapRef: {name: metadata-grpc-configmap, optional: true}
+      image: python:3.7
+      volumeMounts:
+      - {mountPath: /mnt/pipeline, name: pipeline}
+      - {mountPath: /kfp-launcher, name: kfp-launcher}
+    inputs:
+      parameters:
+      - {name: pipeline-name}
+      - {name: pipeline-root}
+    outputs:
+      artifacts:
+      - {name: generate-my-artifacts-outp, path: /tmp/outputs/outp/data}
+    metadata:
+      annotations:
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/component_ref: '{}'
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/enable_caching: "true"
+    initContainers:
+    - command: [launcher, --copy, /kfp-launcher/launch]
+      image: gcr.io/ml-pipeline/kfp-launcher:1.8.7
+      name: kfp-launcher
+      mirrorVolumeMounts: true
+    volumes:
+    - {name: kfp-launcher}
+    - name: pipeline
+      persistentVolumeClaim: {claimName: example-dataset}
+  - name: test-pipeline
+    inputs:
+      parameters:
+      - {name: pipeline-name}
+      - {name: pipeline-root}
+    dag:
+      tasks:
+      - name: generate-my-artifacts
+        template: generate-my-artifacts
+        arguments:
+          parameters:
+          - {name: pipeline-name, value: '{{inputs.parameters.pipeline-name}}'}
+          - {name: pipeline-root, value: '{{inputs.parameters.pipeline-root}}'}
+  arguments:
+    parameters:
+    - {name: pipeline-root, value: ''}
+    - {name: pipeline-name, value: pipeline/test pipeline}
+  serviceAccountName: pipeline-runner

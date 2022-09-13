@@ -37,22 +37,10 @@ implementation:
       ,\n        access_key = MINIO_SERVICE_ACCESS_KEY,\n        secret_key = MINIO_SERVICE_SECRET_KEY,\n\
       \        secure     = MINIO_SERVICE_SECURITY_OPTION\n    )\n\n    os.mkdir(\"\
       /dataset\")\n    dataset.metadata[\"origin\"] = dataset_minio_uri\n    dataset.metadata[\"\
-      local_path\"] = \"/dataset\"    \n    logging.info(os.listdir())\n\n    def\
-      \ _create_rclone_config() -> None:\n\n        with open(\"rclone.conf\", 'w')\
-      \ as conf_file:\n\n            conf_file.write(\"[kf_minio]\\n\")\n        \
-      \    conf_file.write(\"type=s3\\n\")\n            conf_file.write(\"provider\
-      \ = minio\\n\")\n            conf_file.write(f\"env_auth = {MINIO_SERVICE_SECURITY_OPTION}\\\
-      n\")\n            conf_file.write(f\"access_key_id = {MINIO_SERVICE_ACCESS_KEY}\\\
-      n\")\n            conf_file.write(f\"secret_access_key = {MINIO_SERVICE_SECRET_KEY}\\\
-      n\")\n            conf_file.write(f\"endpoint = https://{MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}/\"\
-      )\n\n        logging.info(\"configuration file written\")\n\n    def _mount()\
-      \ -> None:\n\n        import os\n        _create_rclone_config()\n        dir\
-      \ = dataset.metadata[\"local_path\"]\n        os.system(f\"mkdir {dir}\")\n\
-      \        os.system(f\"rclone mount kf_minio:mlpipeline/pipeline {dir} \\\n \
-      \           --daemon --log-file rclone.log \\\n            --config rclone.conf\
-      \ -vv\")\n\n    def _parse_uri(uri:str):        \n        dataset_info = {}\n\
-      \n        if uri.split(\":\")[0]==\"minio\":\n            uri_segments = uri[:8].split('/')\n\
-      \            dataset_info[\"bucket_name\"] = uri_segments[0]\n            dataset_info[\"\
+      local_path\"] = \"/dataset\"    \n    logging.info(os.listdir())\n\n\n    def\
+      \ _parse_uri(uri:str):        \n        dataset_info = {}\n\n        if uri.split(\"\
+      :\")[0]==\"minio\":\n            uri_segments = uri[:8].split('/')\n       \
+      \     dataset_info[\"bucket_name\"] = uri_segments[0]\n            dataset_info[\"\
       directory\"] = os.path.join(*uri_segments[1:])\n        else: \n           \
       \ logging.info(\"wrong URI format, should be minio://bucket/folder/...\")\n\
       \        return dataset_info\n\n    def _validate_datapoint(\n        datapoint_path:Any,\n\

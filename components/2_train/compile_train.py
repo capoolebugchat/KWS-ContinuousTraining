@@ -8,13 +8,13 @@ import kfp.v2.dsl as dsl
 from kfp.v2.dsl import (
     Input, Output, Artifact, Model, Dataset,component)
 
-# @component(
-#     base_image="capoolebugchat/kws-training:v0.12.0",
-#     output_component_file="components/2_train/component_SDKv2.yaml"
-# )
+@component(
+    base_image="capoolebugchat/kws-training:v0.15.0",
+    output_component_file="components/2_train/component_SDKv2.yaml"
+)
 def train(
     model_S3_bucket: str,
-    dataset_uri: str, # kf_minio://bucket/folder
+    dataset_location: str, # path/to/mount/{bucket}/path/to/data
     # config: Input[Artifact],
     # model: Output[Model]
 ) -> None:
@@ -45,24 +45,6 @@ def train(
     logging.info(f"Connected to Minio Server at {MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}")
     
     logging.info(f"{os.listdir}")
-    
-    train_data_dir = "train_dataset2"
-    os.system(f"mkdir {train_data_dir}")
-    os.system(f"modprobe fuse")
-    os.system( \
-        f"rclone mount {dataset_uri} {train_data_dir} \
-        --config rclone.conf \
-        --allow-other \
-        --log-file rclone.log \
-        --vfs-cache-mode full \
-        -vv \
-        --daemon")
-    
-    with open("rclone.log", 'r') as log_file:
-        for line in log_file.readlines():
-            print(line)
-
-    logging.info("Mounted rclone training data folder")
     
     def _yaml_to_env(yaml_file, env_file, data_path):
     
@@ -109,7 +91,7 @@ def train(
     _yaml_to_env(
         yaml_file = "h_param.yaml",
         env_file = "hparam.env",
-        data_path = "train_dataset")
+        data_path = dataset_location)
     
     logging.info("Training model")
     _train()
@@ -123,18 +105,20 @@ def train(
     logging.info("Model uploaded to minio bucket.")
     logging.info(f"Training finished, check storage at minio://{model_S3_bucket}/saved_model/1")
 
-import argparse
 
-# Defining and parsing the command-line arguments
-parser = argparse.ArgumentParser(description='None')
-# Paths must be passed in, not hardcoded
-parser.add_argument('--dataset-uri', type=str,
-  help='Minio URI of training dataset.')
-args = parser.parse_args()
+# RUN AS CONTAINER TRAINING
+# import argparse
 
-train(args.dataset_uri)
+# # Defining and parsing the command-line arguments
+# parser = argparse.ArgumentParser(description='None')
+# # Paths must be passed in, not hardcoded
+# parser.add_argument('--dataset-uri', type=str,
+#   help='Minio URI of training dataset.')
+# args = parser.parse_args()
 
-# V2 compilation
+# train(args.dataset_uri)
+
+# V2 COMPILATION
 # from kfp.compiler import Compiler
 # Compiler().compile(
 #     pipeline_func=train,

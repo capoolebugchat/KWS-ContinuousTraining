@@ -45,29 +45,6 @@ def validate_dataset_from_Minio(
     dataset.metadata["local_path"] = "/dataset"    
     logging.info(os.listdir())
 
-    def _create_rclone_config() -> None:
-        
-        with open("rclone.conf", 'w') as conf_file:
-
-            conf_file.write("[kf_minio]\n")
-            conf_file.write("type=s3\n")
-            conf_file.write("provider = minio\n")
-            conf_file.write(f"env_auth = {MINIO_SERVICE_SECURITY_OPTION}\n")
-            conf_file.write(f"access_key_id = {MINIO_SERVICE_ACCESS_KEY}\n")
-            conf_file.write(f"secret_access_key = {MINIO_SERVICE_SECRET_KEY}\n")
-            conf_file.write(f"endpoint = https://{MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}/")
-            
-        logging.info("configuration file written")
-
-    def _mount() -> None:
-        
-        import os
-        _create_rclone_config()
-        dir = dataset.metadata["local_path"]
-        os.system(f"mkdir {dir}")
-        os.system(f"rclone mount kf_minio:mlpipeline/pipeline {dir} \
-            --daemon --log-file rclone.log \
-            --config rclone.conf -vv")
 
     def _parse_uri(uri:str):        
         dataset_info = {}

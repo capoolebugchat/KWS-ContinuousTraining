@@ -4,7 +4,7 @@ metadata:
   generateName: kws-ct-pipeline-
   annotations:
     pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
-    pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-12T15:24:14.053813'
+    pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-13T10:52:25.452846'
     pipelines.kubeflow.org/pipeline_spec: '{"description": "KWS auto training pipeline.
       Accept minio data folder, manually upload model and artifacts to minio", "inputs":
       [{"default": "test_dataset", "name": "dataset_uri", "optional": true, "type":
@@ -21,7 +21,6 @@ spec:
   - name: kws-ct-pipeline
     inputs:
       parameters:
-      - {name: dataset_uri}
       - {name: model_s3_bucket}
       - {name: pipeline-name}
       - {name: pipeline-root}
@@ -31,7 +30,6 @@ spec:
         template: train
         arguments:
           parameters:
-          - {name: dataset_uri, value: '{{inputs.parameters.dataset_uri}}'}
           - {name: model_s3_bucket, value: '{{inputs.parameters.model_s3_bucket}}'}
           - {name: pipeline-name, value: '{{inputs.parameters.pipeline-name}}'}
           - {name: pipeline-root, value: '{{inputs.parameters.pipeline-root}}'}
@@ -62,9 +60,9 @@ spec:
 
         def train(
             model_S3_bucket: str,
-            dataset_uri: str, # kf_minio://bucket/folder
+            dataset_location: str, # path/to/mount/{bucket}/path/to/data
             # config: Input[Artifact],
-            model: Output[Model]
+            # model: Output[Model]
         ) -> None:
 
             import logging
@@ -72,8 +70,8 @@ spec:
             import yaml
             import os
 
-            logging.info("model path:"+model.path)
-            logging.info("model URI:"+model.uri)
+            # logging.info("model path:"+model.path)
+            # logging.info("model URI:"+model.uri)
 
             MINIO_SERVICE_HOST="minio-service.kubeflow.svc.cluster.local"
             MINIO_SERVICE_PORT="9000"
@@ -93,24 +91,6 @@ spec:
             logging.info(f"Connected to Minio Server at {MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}")
 
             logging.info(f"{os.listdir}")
-
-            train_data_dir = "train_dataset2"
-            os.system(f"mkdir {train_data_dir}")
-            os.system(f"modprobe fuse")
-            os.system( \
-                f"rclone mount {dataset_uri} {train_data_dir} \
-                --config rclone.conf \
-                --allow-other \
-                --log-file rclone.log \
-                --vfs-cache-mode full \
-                -vv \
-                --daemon")
-
-            with open("rclone.log", 'r') as log_file:
-                for line in log_file.readlines():
-                    print(line)
-
-            logging.info("Mounted rclone training data folder")
 
             def _yaml_to_env(yaml_file, env_file, data_path):
 
@@ -148,16 +128,16 @@ spec:
                             os.sep, "/")  # Replace \ with / on Windows
                         minio_client.fput_object(bucket_name, remote_path, local_file)
 
-            model.metadata = {
-                "version":"v0.1.1",
-                "S3_URI":f"S3://{model_S3_bucket}/saved_model"
-                }
+            # model.metadata = {
+            #     "version":"v0.1.1",
+            #     "S3_URI":f"S3://{model_S3_bucket}/saved_model"
+            #     }
 
             logging.info("Loading hyperparams:")
             _yaml_to_env(
                 yaml_file = "h_param.yaml",
                 env_file = "hparam.env",
-                data_path = "train_dataset")
+                data_path = dataset_location)
 
             logging.info("Training model")
             _train()
@@ -181,8 +161,8 @@ spec:
         --run_id, $(KFP_RUN_ID), --run_resource, workflows.argoproj.io/$(WORKFLOW_ID),
         --namespace, $(KFP_NAMESPACE), --pod_name, $(KFP_POD_NAME), --pod_uid, $(KFP_POD_UID),
         --pipeline_root, '{{inputs.parameters.pipeline-root}}', --enable_caching,
-        $(ENABLE_CACHING), --, 'dataset_uri={{inputs.parameters.dataset_uri}}', 'model_S3_bucket={{inputs.parameters.model_s3_bucket}}',
-        --]
+        $(ENABLE_CACHING), --, dataset_location=/workspace/train_dataset/test-train-dataset,
+        'model_S3_bucket={{inputs.parameters.model_s3_bucket}}', --]
       env:
       - name: KFP_POD_NAME
         valueFrom:
@@ -202,31 +182,27 @@ spec:
       - name: ENABLE_CACHING
         valueFrom:
           fieldRef: {fieldPath: 'metadata.labels[''pipelines.kubeflow.org/enable_caching'']'}
-      - {name: KFP_V2_IMAGE, value: 'capoolebugchat/kws-training:v0.12.0'}
-      - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {"dataset_uri": {"type":
-          "STRING"}, "model_S3_bucket": {"type": "STRING"}}, "inputArtifacts": {},
-          "outputParameters": {}, "outputArtifacts": {"model": {"schemaTitle": "system.Model",
-          "instanceSchema": "", "schemaVersion": "0.0.1", "metadataPath": "/tmp/outputs/model/data"}}}'}
+      - {name: KFP_V2_IMAGE, value: 'capoolebugchat/kws-training:v0.15.0'}
+      - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {"dataset_location":
+          {"type": "STRING"}, "model_S3_bucket": {"type": "STRING"}}, "inputArtifacts":
+          {}, "outputParameters": {}, "outputArtifacts": {}}'}
       envFrom:
       - configMapRef: {name: metadata-grpc-configmap, optional: true}
-      image: capoolebugchat/kws-training:v0.12.0
+      image: capoolebugchat/kws-training:v0.15.0
       volumeMounts:
+      - {mountPath: /workspace/train_dataset, name: dataset}
       - {mountPath: /kfp-launcher, name: kfp-launcher}
     inputs:
       parameters:
-      - {name: dataset_uri}
       - {name: model_s3_bucket}
       - {name: pipeline-name}
       - {name: pipeline-root}
-    outputs:
-      artifacts:
-      - {name: train-model, path: /tmp/outputs/model/data}
     metadata:
       annotations:
         pipelines.kubeflow.org/v2_component: "true"
-        pipelines.kubeflow.org/component_ref: '{"digest": "d0bae07bf97eed8b7d8fc383bfb7d351823afcf6323971e91ca7a89fc8f7e341",
+        pipelines.kubeflow.org/component_ref: '{"digest": "ad069ac73ae70a3886b32fc9d483690db9c558176cd462448d5e66d46530a505",
           "url": "components/2_train/component_SDKv2.yaml"}'
-        pipelines.kubeflow.org/arguments.parameters: '{"dataset_uri": "{{inputs.parameters.dataset_uri}}",
+        pipelines.kubeflow.org/arguments.parameters: '{"dataset_location": "/workspace/train_dataset/test-train-dataset",
           "model_S3_bucket": "{{inputs.parameters.model_s3_bucket}}"}'
       labels:
         pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
@@ -239,6 +215,8 @@ spec:
       name: kfp-launcher
       mirrorVolumeMounts: true
     volumes:
+    - name: dataset
+      persistentVolumeClaim: {claimName: example-dataset}
     - {name: kfp-launcher}
   arguments:
     parameters:
