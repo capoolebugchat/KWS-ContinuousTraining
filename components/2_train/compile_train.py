@@ -15,8 +15,8 @@ from kfp.v2.dsl import (
 def train(
     model_S3_bucket: str,
     dataset_location: str, # path/to/mount/{bucket}/path/to/data
-    # config: Input[Artifact],
-    # model: Output[Model]
+    config: Output[Artifact],
+    model: Output[Model]
 ) -> None:
 
     import logging
@@ -24,8 +24,8 @@ def train(
     import yaml
     import os
 
-    # logging.info("model path:"+model.path)
-    # logging.info("model URI:"+model.uri)
+    logging.info("model path:"+model.path)
+    logging.info("model URI:"+model.uri)
     
     MINIO_SERVICE_HOST="minio-service.kubeflow.svc.cluster.local"
     MINIO_SERVICE_PORT="9000"
@@ -42,6 +42,10 @@ def train(
         secure     = MINIO_SERVICE_SECURITY_OPTION
     )
 
+    import os
+    os.system("apt-get install tree")
+    os.system("tree /workspace/train_dataset")
+
     logging.info(f"Connected to Minio Server at {MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}")
     
     logging.info(f"{os.listdir}")
@@ -52,6 +56,8 @@ def train(
         env_f = open(env_file,'w')
     
         hyperparams = yaml.safe_load(yaml_f)
+        hyperparams["batch_size"]=3
+        
         hyperparams['data_path'] = data_path
         print("Loading hyperparams:")
     
@@ -61,7 +67,8 @@ def train(
             if isinstance(hyperparams[key], str):
                 env_f.write(f"{key} = '{hyperparams[key]}'\n")
             else: env_f.write(f"{key} = {hyperparams[key]}\n")
-
+        
+        return hyperparams
 
     def _train():
         logging.info("Traning commencing.")
@@ -82,16 +89,18 @@ def train(
                     os.sep, "/")  # Replace \ with / on Windows
                 minio_client.fput_object(bucket_name, remote_path, local_file)
         
-    # model.metadata = {
-    #     "version":"v0.1.1",
-    #     "S3_URI":f"S3://{model_S3_bucket}/saved_model"
-    #     }
+    model.metadata = {
+        "version":"v0.1.1",
+        "S3_URI":f"S3://{model_S3_bucket}/saved_model"
+        }
 
     logging.info("Loading hyperparams:")
-    _yaml_to_env(
+    hyperparams = _yaml_to_env(
         yaml_file = "h_param.yaml",
         env_file = "hparam.env",
         data_path = dataset_location)
+    config.name = "Train Configuration"
+    config.metadata["contents"] = hyperparams
     
     logging.info("Training model")
     _train()

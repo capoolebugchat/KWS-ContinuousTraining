@@ -10,7 +10,7 @@ background_frequency: 0.8
 training_steps: '2,2,2,2,2,2'
 learning_rate: '0.01,0.005,0.002,0.001,0.0005,0.0002'
 lr_schedule: 'linear'
-batch_size: 1
+batch_size: 2
 eval_step_interval: 1
 
 mel_upper_edge_hertz: 7600.0

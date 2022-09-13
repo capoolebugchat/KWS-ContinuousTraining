@@ -4,7 +4,7 @@ metadata:
   generateName: kws-ct-pipeline-
   annotations:
     pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
-    pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-13T10:52:25.452846'
+    pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-13T14:14:21.525981'
     pipelines.kubeflow.org/pipeline_spec: '{"description": "KWS auto training pipeline.
       Accept minio data folder, manually upload model and artifacts to minio", "inputs":
       [{"default": "test_dataset", "name": "dataset_uri", "optional": true, "type":
@@ -61,8 +61,8 @@ spec:
         def train(
             model_S3_bucket: str,
             dataset_location: str, # path/to/mount/{bucket}/path/to/data
-            # config: Input[Artifact],
-            # model: Output[Model]
+            config: Output[Artifact],
+            model: Output[Model]
         ) -> None:
 
             import logging
@@ -70,8 +70,8 @@ spec:
             import yaml
             import os
 
-            # logging.info("model path:"+model.path)
-            # logging.info("model URI:"+model.uri)
+            logging.info("model path:"+model.path)
+            logging.info("model URI:"+model.uri)
 
             MINIO_SERVICE_HOST="minio-service.kubeflow.svc.cluster.local"
             MINIO_SERVICE_PORT="9000"
@@ -88,6 +88,10 @@ spec:
                 secure     = MINIO_SERVICE_SECURITY_OPTION
             )
 
+            import os
+            os.system("apt-get install tree")
+            os.system("tree /workspace/train_dataset")
+
             logging.info(f"Connected to Minio Server at {MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}")
 
             logging.info(f"{os.listdir}")
@@ -98,6 +102,8 @@ spec:
                 env_f = open(env_file,'w')
 
                 hyperparams = yaml.safe_load(yaml_f)
+                hyperparams["batch_size"]=3
+
                 hyperparams['data_path'] = data_path
                 print("Loading hyperparams:")
 
@@ -108,6 +114,7 @@ spec:
                         env_f.write(f"{key} = '{hyperparams[key]}'\n")
                     else: env_f.write(f"{key} = {hyperparams[key]}\n")
 
+                return hyperparams
 
             def _train():
                 logging.info("Traning commencing.")
@@ -128,16 +135,18 @@ spec:
                             os.sep, "/")  # Replace \ with / on Windows
                         minio_client.fput_object(bucket_name, remote_path, local_file)
 
-            # model.metadata = {
-            #     "version":"v0.1.1",
-            #     "S3_URI":f"S3://{model_S3_bucket}/saved_model"
-            #     }
+            model.metadata = {
+                "version":"v0.1.1",
+                "S3_URI":f"S3://{model_S3_bucket}/saved_model"
+                }
 
             logging.info("Loading hyperparams:")
-            _yaml_to_env(
+            hyperparams = _yaml_to_env(
                 yaml_file = "h_param.yaml",
                 env_file = "hparam.env",
                 data_path = dataset_location)
+            config.name = "Train Configuration"
+            config.metadata["contents"] = hyperparams
 
             logging.info("Training model")
             _train()
@@ -185,7 +194,10 @@ spec:
       - {name: KFP_V2_IMAGE, value: 'capoolebugchat/kws-training:v0.15.0'}
       - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {"dataset_location":
           {"type": "STRING"}, "model_S3_bucket": {"type": "STRING"}}, "inputArtifacts":
-          {}, "outputParameters": {}, "outputArtifacts": {}}'}
+          {}, "outputParameters": {}, "outputArtifacts": {"config": {"schemaTitle":
+          "system.Artifact", "instanceSchema": "", "schemaVersion": "0.0.1", "metadataPath":
+          "/tmp/outputs/config/data"}, "model": {"schemaTitle": "system.Model", "instanceSchema":
+          "", "schemaVersion": "0.0.1", "metadataPath": "/tmp/outputs/model/data"}}}'}
       envFrom:
       - configMapRef: {name: metadata-grpc-configmap, optional: true}
       image: capoolebugchat/kws-training:v0.15.0
@@ -197,10 +209,14 @@ spec:
       - {name: model_s3_bucket}
       - {name: pipeline-name}
       - {name: pipeline-root}
+    outputs:
+      artifacts:
+      - {name: train-config, path: /tmp/outputs/config/data}
+      - {name: train-model, path: /tmp/outputs/model/data}
     metadata:
       annotations:
         pipelines.kubeflow.org/v2_component: "true"
-        pipelines.kubeflow.org/component_ref: '{"digest": "ad069ac73ae70a3886b32fc9d483690db9c558176cd462448d5e66d46530a505",
+        pipelines.kubeflow.org/component_ref: '{"digest": "0420b6717da05022433738996fc9d35d313b835fbc1df68e3c28f22cddc6d2db",
           "url": "components/2_train/component_SDKv2.yaml"}'
         pipelines.kubeflow.org/arguments.parameters: '{"dataset_location": "/workspace/train_dataset/test-train-dataset",
           "model_S3_bucket": "{{inputs.parameters.model_s3_bucket}}"}'
