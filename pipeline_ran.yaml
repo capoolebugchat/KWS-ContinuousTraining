@@ -1,0 +1,247 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: kws-ct-pipeline-
+  annotations:
+    pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+    pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-14T11:36:47.992169'
+    pipelines.kubeflow.org/pipeline_spec: '{"description": "KWS auto training pipeline.
+      Accept minio data folder, manually upload model and artifacts to minio", "inputs":
+      [{"default": "test_dataset", "name": "dataset_uri", "optional": true, "type":
+      "String"}, {"default": "mlpipeline", "name": "model_s3_bucket", "optional":
+      true, "type": "String"}, {"default": "", "name": "pipeline-root"}, {"default":
+      "pipeline/KWS-CT-Pipeline", "name": "pipeline-name"}], "name": "KWS-CT-Pipeline"}'
+    pipelines.kubeflow.org/v2_pipeline: "true"
+  labels:
+    pipelines.kubeflow.org/v2_pipeline: "true"
+    pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+spec:
+  entrypoint: kws-ct-pipeline
+  templates:
+  - name: kws-ct-pipeline
+    inputs:
+      parameters:
+      - {name: model_s3_bucket}
+      - {name: pipeline-name}
+      - {name: pipeline-root}
+    dag:
+      tasks:
+      - name: train
+        template: train
+        arguments:
+          parameters:
+          - {name: model_s3_bucket, value: '{{inputs.parameters.model_s3_bucket}}'}
+          - {name: pipeline-name, value: '{{inputs.parameters.pipeline-name}}'}
+          - {name: pipeline-root, value: '{{inputs.parameters.pipeline-root}}'}
+  - name: train
+    container:
+      args:
+      - sh
+      - -c
+      - |2
+
+        if ! [ -x "$(command -v pip)" ]; then
+            python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
+        fi
+
+        PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'kfp==1.8.13' && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp -d)
+        printf "%s" "$0" > "$program_path/ephemeral_component.py"
+        python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+      - |2+
+
+        import kfp
+        from kfp.v2 import dsl
+        from kfp.v2.dsl import *
+        from typing import *
+
+        def train(
+            model_S3_bucket: str,
+            dataset_location: str, # path/to/mount/{bucket}/path/to/data
+            config: Output[Artifact],
+            model: Output[Model]
+        ) -> None:
+
+            import logging
+            import glob
+            import yaml
+            import os
+
+            logging.info("model path:"+model.path)
+            logging.info("model URI:"+model.uri)
+
+            MINIO_SERVICE_HOST="minio-service.kubeflow.svc.cluster.local"
+            MINIO_SERVICE_PORT="9000"
+            #TODO: change these to using Kubeflow's Minio Secrets
+            MINIO_SERVICE_ACCESS_KEY="minio"
+            MINIO_SERVICE_SECRET_KEY="minio123"
+            MINIO_SERVICE_SECURITY_OPTION=False
+
+            from minio import Minio
+            minio_client = Minio(
+                f"{MINIO_SERVICE_HOST+':'+MINIO_SERVICE_PORT}",
+                access_key = MINIO_SERVICE_ACCESS_KEY,
+                secret_key = MINIO_SERVICE_SECRET_KEY,
+                secure     = MINIO_SERVICE_SECURITY_OPTION
+            )
+
+            import os
+            os.system("apt-get install tree")
+            os.system("tree /workspace/train_dataset")
+
+            logging.info(f"Connected to Minio Server at {MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}")
+
+            logging.info(f"{os.listdir}")
+
+            def _yaml_to_env(yaml_file, env_file, data_path):
+
+                yaml_f = open(yaml_file,'r')
+                env_f = open(env_file,'w')
+
+                hyperparams = yaml.safe_load(yaml_f)
+                hyperparams["batch_size"]=2
+                hyperparams["data_path"] = data_path
+
+                logging.debug(f"HPARAMS: {hyperparams}")
+                logging.debug(f"HPARAMS_class: {hyperparams.__class__}")
+
+                print("Loading hyperparams:")
+                for key in hyperparams:
+                    logging.info(f"{key} = {hyperparams[key]}")
+                    print(f"{key} = {hyperparams[key]}")
+                    if isinstance(hyperparams[key], str):
+                        env_f.write(f"{key} = '{hyperparams[key]}'\n")
+                    else: env_f.write(f"{key} = {hyperparams[key]}\n")
+
+                return hyperparams
+
+            def _train():
+                logging.info("Traning commencing.")
+                os.system("python3 -m kws_streaming.train.model_train_eval ds_tc_resnet --alsologtostderr")
+                logging.info("Training completed.")
+
+            def _upload_local_directory_to_minio(local_path, bucket_name, minio_path):
+                assert os.path.isdir(local_path)
+                for local_file in glob.glob(local_path + '/**'):
+                    local_file = local_file.replace(os.sep, "/") # Replace \ with / on Windows
+                    if not os.path.isfile(local_file):
+                        _upload_local_directory_to_minio(
+                            local_file, bucket_name, minio_path + "/" + os.path.basename(local_file))
+                    else:
+                        remote_path = os.path.join(
+                            minio_path, local_file[1 + len(local_path):])
+                        remote_path = remote_path.replace(
+                            os.sep, "/")  # Replace \ with / on Windows
+                        minio_client.fput_object(bucket_name, remote_path, local_file)
+
+            model.metadata = {
+                "version":"v0.1.1",
+                "S3_URI":f"S3://{model_S3_bucket}/saved_model"
+                }
+
+            logging.info("Loading hyperparams:")
+            hyperparams = _yaml_to_env(
+                yaml_file = "/workspace/h_param.yaml",
+                env_file = "/workspace/hparams.env",
+                data_path = dataset_location)
+            config.name = "Train Configuration"
+            config.metadata["contents"] = hyperparams
+
+            os.system("ls // | grep hparam.env")
+
+            logging.info("Training model")
+            _train()
+
+            logging.info("Uploading model")
+            _upload_local_directory_to_minio(
+                local_path = "./train_res/ds_tc_resnet/non_stream",
+                bucket_name = model_S3_bucket,
+                minio_path = "saved_model/1")
+
+            logging.info("Model uploaded to minio bucket.")
+            logging.info(f"Training finished, check storage at minio://{model_S3_bucket}/saved_model/1")
+
+      - --executor_input
+      - '{{$}}'
+      - --function_to_execute
+      - train
+      command: [/kfp-launcher/launch, --mlmd_server_address, $(METADATA_GRPC_SERVICE_HOST),
+        --mlmd_server_port, $(METADATA_GRPC_SERVICE_PORT), --runtime_info_json, $(KFP_V2_RUNTIME_INFO),
+        --container_image, $(KFP_V2_IMAGE), --task_name, train, --pipeline_name, '{{inputs.parameters.pipeline-name}}',
+        --run_id, $(KFP_RUN_ID), --run_resource, workflows.argoproj.io/$(WORKFLOW_ID),
+        --namespace, $(KFP_NAMESPACE), --pod_name, $(KFP_POD_NAME), --pod_uid, $(KFP_POD_UID),
+        --pipeline_root, '{{inputs.parameters.pipeline-root}}', --enable_caching,
+        $(ENABLE_CACHING), --, dataset_location=train_dataset/test-train-dataset,
+        'model_S3_bucket={{inputs.parameters.model_s3_bucket}}', --]
+      env:
+      - name: KFP_POD_NAME
+        valueFrom:
+          fieldRef: {fieldPath: metadata.name}
+      - name: KFP_POD_UID
+        valueFrom:
+          fieldRef: {fieldPath: metadata.uid}
+      - name: KFP_NAMESPACE
+        valueFrom:
+          fieldRef: {fieldPath: metadata.namespace}
+      - name: WORKFLOW_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''workflows.argoproj.io/workflow'']'}
+      - name: KFP_RUN_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipeline/runid'']'}
+      - name: ENABLE_CACHING
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipelines.kubeflow.org/enable_caching'']'}
+      - {name: KFP_V2_IMAGE, value: 'capoolebugchat/kws-training:v0.17.0'}
+      - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {"dataset_location":
+          {"type": "STRING"}, "model_S3_bucket": {"type": "STRING"}}, "inputArtifacts":
+          {}, "outputParameters": {}, "outputArtifacts": {"config": {"schemaTitle":
+          "system.Artifact", "instanceSchema": "", "schemaVersion": "0.0.1", "metadataPath":
+          "/tmp/outputs/config/data"}, "model": {"schemaTitle": "system.Model", "instanceSchema":
+          "", "schemaVersion": "0.0.1", "metadataPath": "/tmp/outputs/model/data"}}}'}
+      envFrom:
+      - configMapRef: {name: metadata-grpc-configmap, optional: true}
+      image: capoolebugchat/kws-training:v0.17.0
+      volumeMounts:
+      - {mountPath: /workspace/train_dataset, name: dataset}
+      - {mountPath: /kfp-launcher, name: kfp-launcher}
+    inputs:
+      parameters:
+      - {name: model_s3_bucket}
+      - {name: pipeline-name}
+      - {name: pipeline-root}
+    outputs:
+      artifacts:
+      - {name: train-config, path: /tmp/outputs/config/data}
+      - {name: train-model, path: /tmp/outputs/model/data}
+    metadata:
+      annotations:
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/component_ref: '{"digest": "38a0e18ab23fbb838f35159d3e1e2877cb790538db2565e4ffb9f1df3225d923",
+          "url": "components/2_train/component_SDKv2.yaml"}'
+        pipelines.kubeflow.org/arguments.parameters: '{"dataset_location": "train_dataset/test-train-dataset",
+          "model_S3_bucket": "{{inputs.parameters.model_s3_bucket}}"}'
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/enable_caching: "true"
+    initContainers:
+    - command: [launcher, --copy, /kfp-launcher/launch]
+      image: gcr.io/ml-pipeline/kfp-launcher:1.8.7
+      name: kfp-launcher
+      mirrorVolumeMounts: true
+    volumes:
+    - name: dataset
+      persistentVolumeClaim: {claimName: example-dataset}
+    - {name: kfp-launcher}
+  arguments:
+    parameters:
+    - {name: dataset_uri, value: test_dataset}
+    - {name: model_s3_bucket, value: mlpipeline}
+    - {name: pipeline-root, value: ''}
+    - {name: pipeline-name, value: pipeline/KWS-CT-Pipeline}
+  serviceAccountName: pipeline-runner

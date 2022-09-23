@@ -2,6 +2,7 @@
 # Download data offline (to kfp-launcher), use them for all the things
 
 from collections import namedtuple
+from typing import Dict, Optional
 from minio import Minio
 import kfp
 import kfp.v2.dsl as dsl
@@ -9,23 +10,21 @@ from kfp.v2.dsl import (
     Input, Output, Artifact, Model, Dataset,component)
 
 @component(
-    base_image="capoolebugchat/kws-training:v0.15.0",
+    base_image="capoolebugchat/kws-training:v0.17.0",
     output_component_file="components/2_train/component_SDKv2.yaml"
 )
 def train(
     model_S3_bucket: str,
-    dataset_location: str, # path/to/mount/{bucket}/path/to/data
-    config: Output[Artifact],
-    model: Output[Model]
+    dataset_location: str, # /{path-to-mount}/path/to/dataset
+    config_dict: Optional[Dict],
+    # config: Output[Artifact],
+    # model: Output[Model]
 ) -> None:
 
     import logging
     import glob
     import yaml
     import os
-
-    logging.info("model path:"+model.path)
-    logging.info("model URI:"+model.uri)
     
     MINIO_SERVICE_HOST="minio-service.kubeflow.svc.cluster.local"
     MINIO_SERVICE_PORT="9000"
@@ -44,31 +43,33 @@ def train(
 
     import os
     os.system("apt-get install tree")
+    os.system("pip install mlflow")
     os.system("tree /workspace/train_dataset")
 
     logging.info(f"Connected to Minio Server at {MINIO_SERVICE_HOST}:{MINIO_SERVICE_PORT}")
     
     logging.info(f"{os.listdir}")
     
-    def _yaml_to_env(yaml_file, env_file, data_path):
+    def _dict_to_env(dict):
     
-        yaml_f = open(yaml_file,'r')
-        env_f = open(env_file,'w')
-    
-        hyperparams = yaml.safe_load(yaml_f)
-        hyperparams["batch_size"]=3
+        env_f = open("/workspace/hparams.env",'w')
+        hyperparams = dict
         
-        hyperparams['data_path'] = data_path
         print("Loading hyperparams:")
-    
         for key in hyperparams:
-            logging.info(f"{key} = {hyperparams[key]}")
-            print(f"{key} = {hyperparams[key]}")
-            if isinstance(hyperparams[key], str):
-                env_f.write(f"{key} = '{hyperparams[key]}'\n")
-            else: env_f.write(f"{key} = {hyperparams[key]}\n")
+            hyperparam = hyperparams[key]
+            if key in config_dict:
+                hyperparam = config_dict[key]
+            logging.info(f"{key} = {hyperparam}")
+            print(f"{key} = {hyperparam}")
+            if isinstance(hyperparam, str):
+                env_f.write(f"{key} = '{hyperparam}'\n")
+            else: env_f.write(f"{key} = {hyperparam}\n")
         
         return hyperparams
+
+    import mlflow
+    mlflow.set_tracking_uri("http://mlflowserver.kubeflow:5000")
 
     def _train():
         logging.info("Traning commencing.")
@@ -89,30 +90,32 @@ def train(
                     os.sep, "/")  # Replace \ with / on Windows
                 minio_client.fput_object(bucket_name, remote_path, local_file)
         
-    model.metadata = {
-        "version":"v0.1.1",
-        "S3_URI":f"S3://{model_S3_bucket}/saved_model"
-        }
-
     logging.info("Loading hyperparams:")
-    hyperparams = _yaml_to_env(
-        yaml_file = "h_param.yaml",
-        env_file = "hparam.env",
-        data_path = dataset_location)
-    config.name = "Train Configuration"
-    config.metadata["contents"] = hyperparams
-    
+    hyperparams = _dict_to_env(config_dict)
+    # config.name = "Train Configuration"
+    # config.metadata["contents"] = hyperparams
+
     logging.info("Training model")
     _train()
+    model_bucket = model_S3_bucket
+    model_path = "trained_models/KWS/saved_model/1"
+    # model.metadata = {
+    # "version":"Undesigned, Unimplemented",
+    # "S3_BUCKET": model_bucket,
+    # "S3_PATH": model_path,
+    # "S3_URI":f"kf_minio://{model_S3_bucket}/{model_path}"
+    # }
     
     logging.info("Uploading model")
     _upload_local_directory_to_minio(
         local_path = "./train_res/ds_tc_resnet/non_stream",
         bucket_name = model_S3_bucket,
-        minio_path = "saved_model/1")
+        minio_path = model_path)
     
     logging.info("Model uploaded to minio bucket.")
     logging.info(f"Training finished, check storage at minio://{model_S3_bucket}/saved_model/1")
+
+    mlflow.tensorflow.log_model(tf_saved_model_dir = "/workspace/train_res/ds_tc_resnet/non-stream")
 
 
 # RUN AS CONTAINER TRAINING

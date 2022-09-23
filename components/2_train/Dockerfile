@@ -9,11 +9,11 @@ COPY . .
 RUN ls .
 RUN pip install -r requirements.txt --no-cache-dir
 RUN pip install -U numpy
-RUN apt install -y kmod
-RUN apt install -y fuse
-RUN apt install -y libfuse2
+# RUN apt install -y kmod
+# RUN apt install -y fuse
+# RUN apt install -y libfuse2
 RUN python3 -m pip install -U minio
-RUN apt install nano
+RUN pip install pyyaml
 
 # RUN ls
 # ENTRYPOINT ["python3 train.py --dataset-uri"]

@@ -25,7 +25,7 @@ def pipeline(
     #     version = "v0.0.1")
     train_task = train_op(
         model_s3_bucket = model_s3_bucket,
-        dataset_location = "/workspace/train_dataset/test-train-dataset"
+        dataset_location = "train_dataset/test-train-dataset"
     )
     train_task.apply(mount_pvc(
         pvc_name="example-dataset",
